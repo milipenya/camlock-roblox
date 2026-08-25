@@ -5,17 +5,14 @@ local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
 local Target = nil
-local Connection = nil
 local IsActive = false
 local CurrentHighlight = nil
-
 local LockPart = "HumanoidRootPart"
 local CamDistance = 12
 local Smoothness = 1
 local FullESPActive = false
 local FullESPHighlights = {}
 local TeamCheckActive = false
-local ActiveTab = "Camlock"
 
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "InkGamePremiumGui"
@@ -66,7 +63,7 @@ local MainFrame = Instance.new("Frame")
 MainFrame.Parent = ScreenGui
 MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
 MainFrame.Position = UDim2.new(0.05, 0, 0.15, 0)
-MainFrame.Size = UDim2.new(0, 230, 0, 420)
+MainFrame.Size = UDim2.new(0, 220, 0, 440)
 local MainCorner = Instance.new("UICorner")
 MainCorner.CornerRadius = UDim.new(0, 10)
 MainCorner.Parent = MainFrame
@@ -80,57 +77,69 @@ Title.Size = UDim2.new(1, 0, 0, 25)
 Title.Font = Enum.Font.SourceSansBold
 Title.Text = "INK GAME PREMIUM"
 Title.TextColor3 = Color3.fromRGB(255, 40, 40)
-Title.TextSize = 16
+Title.TextSize = 18
 
-local TabContainer = Instance.new("Frame")
-TabContainer.Parent = MainFrame
-TabContainer.BackgroundTransparency = 1
-TabContainer.Position = UDim2.new(0.05, 0, 0.08, 0)
-TabContainer.Size = UDim2.new(0, 207, 0, 30)
+local TabPanel = Instance.new("Frame")
+TabPanel.Parent = MainFrame
+TabPanel.BackgroundTransparency = 1
+TabPanel.Position = UDim2.new(0, 0, 0, 35)
+TabPanel.Size = UDim2.new(1, 0, 0, 30)
 
-local CamlockTabBtn = Instance.new("TextButton")
-CamlockTabBtn.Parent = TabContainer
-CamlockTabBtn.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-CamlockTabBtn.Size = UDim2.new(0, 100, 1, 0)
-CamlockTabBtn.Font = Enum.Font.SourceSansBold
-CamlockTabBtn.Text = "CAMLOCK"
-CamlockTabBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-CamlockTabBtn.TextSize = 14
-local CamlockTabCorner = Instance.new("UICorner")
-CamlockTabCorner.CornerRadius = UDim.new(0, 4)
-CamlockTabCorner.Parent = CamlockTabBtn
+local CamlockTab = Instance.new("TextButton")
+CamlockTab.Parent = TabPanel
+CamlockTab.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+CamlockTab.Size = UDim2.new(0.5, 0, 1, 0)
+CamlockTab.Font = Enum.Font.SourceSansBold
+CamlockTab.Text = "CAMLOCK"
+CamlockTab.TextColor3 = Color3.fromRGB(255, 255, 255)
+CamlockTab.TextSize = 14
 
-local AimbotTabBtn = Instance.new("TextButton")
-AimbotTabBtn.Parent = TabContainer
-AimbotTabBtn.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
-AimbotTabBtn.Position = UDim2.new(0.52, 0, 0, 0)
-AimbotTabBtn.Size = UDim2.new(0, 100, 1, 0)
-AimbotTabBtn.Font = Enum.Font.SourceSansBold
-AimbotTabBtn.Text = "AIMBOT"
-AimbotTabBtn.TextColor3 = Color3.fromRGB(150, 150, 150)
-AimbotTabBtn.TextSize = 14
-local AimbotTabCorner = Instance.new("UICorner")
-AimbotTabCorner.CornerRadius = UDim.new(0, 4)
-AimbotTabCorner.Parent = AimbotTabBtn
+local AimbotTab = Instance.new("TextButton")
+AimbotTab.Parent = TabPanel
+AimbotTab.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+AimbotTab.Position = UDim2.new(0.5, 0, 0, 0)
+AimbotTab.Size = UDim2.new(0.5, 0, 1, 0)
+AimbotTab.Font = Enum.Font.SourceSansBold
+AimbotTab.Text = "AIMBOT"
+AimbotTab.TextColor3 = Color3.fromRGB(150, 150, 150)
+AimbotTab.TextSize = 14
 
-local CamlockContent = Instance.new("Frame")
-CamlockContent.Parent = MainFrame
-CamlockContent.BackgroundTransparency = 1
-CamlockContent.Position = UDim2.new(0, 0, 0.16, 0)
-CamlockContent.Size = UDim2.new(1, 0, 0.84, 0)
+local CamlockFrame = Instance.new("Frame")
+CamlockFrame.Parent = MainFrame
+CamlockFrame.BackgroundTransparency = 1
+CamlockFrame.Position = UDim2.new(0, 0, 0, 70)
+CamlockFrame.Size = UDim2.new(1, 0, 1, -70)
 
-local AimbotContent = Instance.new("Frame")
-AimbotContent.Parent = MainFrame
-AimbotContent.BackgroundTransparency = 1
-AimbotContent.Position = UDim2.new(0, 0, 0.16, 0)
-AimbotContent.Size = UDim2.new(1, 0, 0.84, 0)
-AimbotContent.Visible = false
+local AimbotFrame = Instance.new("Frame")
+AimbotFrame.Parent = MainFrame
+AimbotFrame.BackgroundTransparency = 1
+AimbotFrame.Position = UDim2.new(0, 0, 0, 70)
+AimbotFrame.Size = UDim2.new(1, 0, 1, -70)
+AimbotFrame.Visible = false
+
+CamlockTab.MouseButton1Click:Connect(function()
+    CamlockFrame.Visible = true
+    AimbotFrame.Visible = false
+    CamlockTab.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+    CamlockTab.TextColor3 = Color3.fromRGB(255, 255, 255)
+    AimbotTab.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+    AimbotTab.TextColor3 = Color3.fromRGB(150, 150, 150)
+end)
+
+AimbotTab.MouseButton1Click:Connect(function()
+    CamlockFrame.Visible = false
+    AimbotFrame.Visible = true
+    AimbotTab.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+    AimbotTab.TextColor3 = Color3.fromRGB(255, 255, 255)
+    CamlockTab.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+    CamlockTab.TextColor3 = Color3.fromRGB(150, 150, 150)
+end)
 
 local ToggleButton = Instance.new("TextButton")
-ToggleButton.Parent = CamlockContent
+ToggleButton.Parent = CamlockFrame
 ToggleButton.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 ToggleButton.Position = UDim2.new(0.05, 0, 0.02, 0)
-ToggleButton.Size = UDim2.new(0, 207, 0, 40)
+ToggleButton.Size = UDim2.new(0, 200, 0, 40)
 ToggleButton.Font = Enum.Font.SourceSansBold
 ToggleButton.Text = "CAMLOCK: OFF"
 ToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -139,119 +148,21 @@ local ToggleCorner = Instance.new("UICorner")
 ToggleCorner.CornerRadius = UDim.new(0, 6)
 ToggleCorner.Parent = ToggleButton
 
-local DistTitle = Instance.new("TextLabel")
-DistTitle.Parent = CamlockContent
-DistTitle.BackgroundTransparency = 1
-DistTitle.Position = UDim2.new(0.05, 0, 0.16, 0)
-DistTitle.Size = UDim2.new(0, 207, 0, 20)
-DistTitle.Font = Enum.Font.SourceSansBold
-DistTitle.Text = "CAMERA DISTANCE: 12"
-DistTitle.TextColor3 = Color3.fromRGB(180, 180, 180)
-DistTitle.TextSize = 14
-
-local DistMinus = Instance.new("TextButton")
-DistMinus.Parent = CamlockContent
-DistMinus.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-DistMinus.Position = UDim2.new(0.05, 0, 0.23, 0)
-DistMinus.Size = UDim2.new(0, 98, 0, 35)
-DistMinus.Font = Enum.Font.SourceSansBold
-DistMinus.Text = "- DIST"
-DistMinus.TextColor3 = Color3.fromRGB(255, 255, 255)
-DistMinus.TextSize = 14
-local MinusCorner = Instance.new("UICorner")
-MinusCorner.CornerRadius = UDim.new(0, 6)
-MinusCorner.Parent = DistMinus
-
-local DistPlus = Instance.new("TextButton")
-DistPlus.Parent = CamlockContent
-DistPlus.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-DistPlus.Position = UDim2.new(0.52, 0, 0.23, 0)
-DistPlus.Size = UDim2.new(0, 98, 0, 35)
-DistPlus.Font = Enum.Font.SourceSansBold
-DistPlus.Text = "+ DIST"
-DistPlus.TextColor3 = Color3.fromRGB(255, 255, 255)
-DistPlus.TextSize = 14
-local PlusCorner = Instance.new("UICorner")
-PlusCorner.CornerRadius = UDim.new(0, 6)
-PlusCorner.Parent = DistPlus
-
-local SmoothTitle = Instance.new("TextLabel")
-SmoothTitle.Parent = CamlockContent
-SmoothTitle.BackgroundTransparency = 1
-SmoothTitle.Position = UDim2.new(0.05, 0, 0.36, 0)
-SmoothTitle.Size = UDim2.new(0, 207, 0, 20)
-SmoothTitle.Font = Enum.Font.SourceSansBold
-SmoothTitle.Text = "SMOOTHNESS: INSTANT"
-SmoothTitle.TextColor3 = Color3.fromRGB(180, 180, 180)
-SmoothTitle.TextSize = 14
-
-local SmoothToggle = Instance.new("TextButton")
-SmoothToggle.Parent = CamlockContent
-SmoothToggle.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-SmoothToggle.Position = UDim2.new(0.05, 0, 0.43, 0)
-SmoothToggle.Size = UDim2.new(0, 207, 0, 35)
-SmoothToggle.Font = Enum.Font.SourceSansBold
-SmoothToggle.Text = "CHANGE SMOOTHNESS"
-SmoothToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
-SmoothToggle.TextSize = 14
-local SmoothCorner = Instance.new("UICorner")
-SmoothCorner.CornerRadius = UDim.new(0, 6)
-SmoothCorner.Parent = SmoothToggle
-
-local EspToggle = Instance.new("TextButton")
-EspToggle.Parent = CamlockContent
-EspToggle.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-EspToggle.Position = UDim2.new(0.05, 0, 0.58, 0)
-EspToggle.Size = UDim2.new(0, 207, 0, 40)
-EspToggle.Font = Enum.Font.SourceSansBold
-EspToggle.Text = "FULL SERVER ESP: OFF"
-EspToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
-EspToggle.TextSize = 14
-local EspCorner = Instance.new("UICorner")
-EspCorner.CornerRadius = UDim.new(0, 6)
-EspCorner.Parent = EspToggle
-
-local AimToggleButton = Instance.new("TextButton")
-AimToggleButton.Parent = AimbotContent
-AimToggleButton.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-AimToggleButton.Position = UDim2.new(0.05, 0, 0.02, 0)
-AimToggleButton.Size = UDim2.new(0, 207, 0, 40)
-AimToggleButton.Font = Enum.Font.SourceSansBold
-AimToggleButton.Text = "AIMBOT LOCK: OFF"
-AimToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-AimToggleButton.TextSize = 16
-local AimToggleCorner = Instance.new("UICorner")
-AimToggleCorner.CornerRadius = UDim.new(0, 6)
-AimToggleCorner.Parent = AimToggleButton
-
-local TeamToggle = Instance.new("TextButton")
-TeamToggle.Parent = AimbotContent
-TeamToggle.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-TeamToggle.Position = UDim2.new(0.05, 0, 0.16, 0)
-TeamToggle.Size = UDim2.new(0, 207, 0, 35)
-TeamToggle.Font = Enum.Font.SourceSansBold
-TeamToggle.Text = "TEAM CHECKER: OFF"
-TeamToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
-TeamToggle.TextSize = 14
-local TeamCorner = Instance.new("UICorner")
-TeamCorner.CornerRadius = UDim.new(0, 6)
-TeamCorner.Parent = TeamToggle
-
 local PartTitle = Instance.new("TextLabel")
-PartTitle.Parent = AimbotContent
+PartTitle.Parent = CamlockFrame
 PartTitle.BackgroundTransparency = 1
-PartTitle.Position = UDim2.new(0.05, 0, 0.28, 0)
-PartTitle.Size = UDim2.new(0, 207, 0, 20)
+PartTitle.Position = UDim2.new(0.05, 0, 0.16, 0)
+PartTitle.Size = UDim2.new(0, 200, 0, 20)
 PartTitle.Font = Enum.Font.SourceSansBold
 PartTitle.Text = "TARGET PART"
 PartTitle.TextColor3 = Color3.fromRGB(180, 180, 180)
 PartTitle.TextSize = 14
 
 local HeadButton = Instance.new("TextButton")
-HeadButton.Parent = AimbotContent
+HeadButton.Parent = CamlockFrame
 HeadButton.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-HeadButton.Position = UDim2.new(0.05, 0, 0.35, 0)
-HeadButton.Size = UDim2.new(0, 98, 0, 35)
+HeadButton.Position = UDim2.new(0.05, 0, 0.23, 0)
+HeadButton.Size = UDim2.new(0, 95, 0, 35)
 HeadButton.Font = Enum.Font.SourceSansBold
 HeadButton.Text = "HEAD"
 HeadButton.TextColor3 = Color3.fromRGB(150, 150, 150)
@@ -261,10 +172,10 @@ HeadCorner.CornerRadius = UDim.new(0, 6)
 HeadCorner.Parent = HeadButton
 
 local TorsoButton = Instance.new("TextButton")
-TorsoButton.Parent = AimbotContent
+TorsoButton.Parent = CamlockFrame
 TorsoButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-TorsoButton.Position = UDim2.new(0.52, 0, 0.35, 0)
-TorsoButton.Size = UDim2.new(0, 98, 0, 35)
+TorsoButton.Position = UDim2.new(0.53, 0, 0.23, 0)
+TorsoButton.Size = UDim2.new(0, 95, 0, 35)
 TorsoButton.Font = Enum.Font.SourceSansBold
 TorsoButton.Text = "TORSO"
 TorsoButton.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -273,38 +184,163 @@ local TorsoCorner = Instance.new("UICorner")
 TorsoCorner.CornerRadius = UDim.new(0, 6)
 TorsoCorner.Parent = TorsoButton
 
-local NoticeLabel = Instance.new("TextLabel")
-NoticeLabel.Parent = AimbotContent
-NoticeLabel.BackgroundTransparency = 1
-NoticeLabel.Position = UDim2.new(0.05, 0, 0.52, 0)
-NoticeLabel.Size = UDim2.new(0, 207, 0, 45)
-NoticeLabel.Font = Enum.Font.SourceSansItalic
-NoticeLabel.Text = "Priority focus: Targets with a red highlight or a visual overhead arrow."
-NoticeLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
-NoticeLabel.TextSize = 12
-NoticeLabel.TextWrapped = true
+local DistTitle = Instance.new("TextLabel")
+DistTitle.Parent = CamlockFrame
+DistTitle.BackgroundTransparency = 1
+DistTitle.Position = UDim2.new(0.05, 0, 0.36, 0)
+DistTitle.Size = UDim2.new(0, 200, 0, 20)
+DistTitle.Font = Enum.Font.SourceSansBold
+DistTitle.Text = "CAMERA DISTANCE: 12"
+DistTitle.TextColor3 = Color3.fromRGB(180, 180, 180)
+DistTitle.TextSize = 14
+
+local DistMinus = Instance.new("TextButton")
+DistMinus.Parent = CamlockFrame
+DistMinus.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+DistMinus.Position = UDim2.new(0.05, 0, 0.43, 0)
+DistMinus.Size = UDim2.new(0, 95, 0, 35)
+DistMinus.Font = Enum.Font.SourceSansBold
+DistMinus.Text = "- DIST"
+DistMinus.TextColor3 = Color3.fromRGB(255, 255, 255)
+DistMinus.TextSize = 14
+local MinusCorner = Instance.new("UICorner")
+MinusCorner.CornerRadius = UDim.new(0, 6)
+MinusCorner.Parent = DistMinus
+
+local DistPlus = Instance.new("TextButton")
+DistPlus.Parent = CamlockFrame
+DistPlus.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+DistPlus.Position = UDim2.new(0.53, 0, 0.43, 0)
+DistPlus.Size = UDim2.new(0, 95, 0, 35)
+DistPlus.Font = Enum.Font.SourceSansBold
+DistPlus.Text = "+ DIST"
+DistPlus.TextColor3 = Color3.fromRGB(255, 255, 255)
+DistPlus.TextSize = 14
+local PlusCorner = Instance.new("UICorner")
+PlusCorner.CornerRadius = UDim.new(0, 6)
+PlusCorner.Parent = DistPlus
+
+local SmoothTitle = Instance.new("TextLabel")
+SmoothTitle.Parent = CamlockFrame
+SmoothTitle.BackgroundTransparency = 1
+SmoothTitle.Position = UDim2.new(0.05, 0, 0.55, 0)
+SmoothTitle.Size = UDim2.new(0, 200, 0, 20)
+SmoothTitle.Font = Enum.Font.SourceSansBold
+SmoothTitle.Text = "SMOOTHNESS: INSTANT"
+SmoothTitle.TextColor3 = Color3.fromRGB(180, 180, 180)
+SmoothTitle.TextSize = 14
+
+local SmoothToggle = Instance.new("TextButton")
+SmoothToggle.Parent = CamlockFrame
+SmoothToggle.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+SmoothToggle.Position = UDim2.new(0.05, 0, 0.62, 0)
+SmoothToggle.Size = UDim2.new(0, 200, 0, 35)
+SmoothToggle.Font = Enum.Font.SourceSansBold
+SmoothToggle.Text = "CHANGE SMOOTHNESS"
+SmoothToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+SmoothToggle.TextSize = 14
+local SmoothCorner = Instance.new("UICorner")
+SmoothCorner.CornerRadius = UDim.new(0, 6)
+SmoothCorner.Parent = SmoothToggle
+
+local EspToggle = Instance.new("TextButton")
+EspToggle.Parent = CamlockFrame
+EspToggle.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+EspToggle.Position = UDim2.new(0.05, 0, 0.76, 0)
+EspToggle.Size = UDim2.new(0, 200, 0, 40)
+EspToggle.Font = Enum.Font.SourceSansBold
+EspToggle.Text = "FULL SERVER ESP: OFF"
+EspToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+EspToggle.TextSize = 14
+local EspCorner = Instance.new("UICorner")
+EspCorner.CornerRadius = UDim.new(0, 6)
+EspCorner.Parent = EspToggle
+
+local AimButton = Instance.new("TextButton")
+AimButton.Parent = AimbotFrame
+AimButton.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+AimButton.Position = UDim2.new(0.05, 0, 0.02, 0)
+AimButton.Size = UDim2.new(0, 200, 0, 40)
+AimButton.Font = Enum.Font.SourceSansBold
+AimButton.Text = "AIMBOT: OFF"
+AimButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+AimButton.TextSize = 16
+local AimCorner = Instance.new("UICorner")
+AimCorner.CornerRadius = UDim.new(0, 6)
+AimCorner.Parent = AimButton
+
+local AimTeamToggle = Instance.new("TextButton")
+AimTeamToggle.Parent = AimbotFrame
+AimTeamToggle.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+AimTeamToggle.Position = UDim2.new(0.05, 0, 0.16, 0)
+AimTeamToggle.Size = UDim2.new(0, 200, 0, 35)
+AimTeamToggle.Font = Enum.Font.SourceSansBold
+AimTeamToggle.Text = "TEAM CHECKER: OFF"
+AimTeamToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+AimTeamToggle.TextSize = 14
+local AimTeamCorner = Instance.new("UICorner")
+AimTeamCorner.CornerRadius = UDim.new(0, 6)
+AimTeamCorner.Parent = AimTeamToggle
+
+local FOVLabel = Instance.new("TextLabel")
+FOVLabel.Parent = AimbotFrame
+FOVLabel.BackgroundTransparency = 1
+FOVLabel.Position = UDim2.new(0.05, 0, 0.28, 0)
+FOVLabel.Size = UDim2.new(0, 200, 0, 20)
+FOVLabel.Font = Enum.Font.SourceSansBold
+FOVLabel.Text = "FOV RADIUS: 100"
+FOVLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
+FOVLabel.TextSize = 14
+
+local FOVMinus = Instance.new("TextButton")
+FOVMinus.Parent = AimbotFrame
+FOVMinus.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+FOVMinus.Position = UDim2.new(0.05, 0, 0.35, 0)
+FOVMinus.Size = UDim2.new(0, 95, 0, 35)
+FOVMinus.Font = Enum.Font.SourceSansBold
+FOVMinus.Text = "- FOV"
+FOVMinus.TextColor3 = Color3.fromRGB(255, 255, 255)
+FOVMinus.TextSize = 14
+local FOVMinusCorner = Instance.new("UICorner")
+FOVMinusCorner.CornerRadius = UDim.new(0, 6)
+FOVMinusCorner.Parent = FOVMinus
+
+local FOVPlus = Instance.new("TextButton")
+FOVPlus.Parent = AimbotFrame
+FOVPlus.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+FOVPlus.Position = UDim2.new(0.53, 0, 0.35, 0)
+FOVPlus.Size = UDim2.new(0, 95, 0, 35)
+FOVPlus.Font = Enum.Font.SourceSansBold
+FOVPlus.Text = "+ FOV"
+FOVPlus.TextColor3 = Color3.fromRGB(255, 255, 255)
+FOVPlus.TextSize = 14
+local FOVPlusCorner = Instance.new("UICorner")
+FOVPlusCorner.CornerRadius = UDim.new(0, 6)
+FOVPlusCorner.Parent = FOVPlus
+
+local InfoLabel = Instance.new("TextLabel")
+InfoLabel.Parent = AimbotFrame
+InfoLabel.BackgroundTransparency = 1
+InfoLabel.Position = UDim2.new(0.05, 0, 0.50, 0)
+InfoLabel.Size = UDim2.new(0, 200, 0, 100)
+InfoLabel.Font = Enum.Font.SourceSansItalic
+InfoLabel.Text = "Aimbot does not control camera.\nMove your camera freely.\nIt magnetizes to the best target\ninside the FOV ring.\nPrioritizes highlighted targets!"
+InfoLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
+InfoLabel.TextSize = 12
+InfoLabel.TextWrapped = true
+
+local FOVCircle = Drawing.new("Circle")
+FOVCircle.Thickness = 2
+FOVCircle.Color = Color3.fromRGB(255, 40, 40)
+FOVCircle.Filled = false
+FOVCircle.Transparency = 0.7
+FOVCircle.Radius = 100
+FOVCircle.Visible = false
+
+local AimbotActive = false
+local FOVRadius = 100
 
 MenuButton.MouseButton1Click:Connect(function() MainFrame.Visible = not MainFrame.Visible end)
-
-CamlockTabBtn.MouseButton1Click:Connect(function()
-    ActiveTab = "Camlock"
-    CamlockContent.Visible = true
-    AimbotContent.Visible = false
-    CamlockTabBtn.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-    CamlockTabBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    AimbotTabBtn.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
-    AimbotTabBtn.TextColor3 = Color3.fromRGB(150, 150, 150)
-end)
-
-AimbotTabBtn.MouseButton1Click:Connect(function()
-    ActiveTab = "Aimbot"
-    CamlockContent.Visible = false
-    AimbotContent.Visible = true
-    AimbotTabBtn.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-    AimbotTabBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    CamlockTabBtn.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
-    CamlockTabBtn.TextColor3 = Color3.fromRGB(150, 150, 150)
-end)
 
 HeadButton.MouseButton1Click:Connect(function()
     LockPart = "Head"
@@ -322,39 +358,125 @@ TorsoButton.MouseButton1Click:Connect(function()
     HeadButton.TextColor3 = Color3.fromRGB(150, 150, 150)
 end)
 
-DistMinus.MouseButton1Click:Connect(function()
-    if CamDistance > 5 then CamDistance = CamDistance - 2 DistTitle.Text = "CAMERA DISTANCE: " .. tostring(CamDistance) end
-end)
-
-DistPlus.MouseButton1Click:Connect(function()
-    if CamDistance < 30 then CamDistance = CamDistance + 2 DistTitle.Text = "CAMERA DISTANCE: " .. tostring(CamDistance) end
-end)
+DistMinus.MouseButton1Click:Connect(function() if CamDistance > 5 then CamDistance = CamDistance - 2 DistTitle.Text = "CAMERA DISTANCE: " .. tostring(CamDistance) end end)
+DistPlus.MouseButton1Click:Connect(function() if CamDistance < 30 then CamDistance = CamDistance + 2 DistTitle.Text = "CAMERA DISTANCE: " .. tostring(CamDistance) end end)
 
 SmoothToggle.MouseButton1Click:Connect(function()
     if Smoothness == 1 then Smoothness = 0.15 SmoothTitle.Text = "SMOOTHNESS: SMOOTH" else Smoothness = 1 SmoothTitle.Text = "SMOOTHNESS: INSTANT" end
 end)
 
-TeamToggle.MouseButton1Click:Connect(function()
-    TeamCheckActive = not TeamCheckActive
-    if TeamCheckActive then
-        TeamToggle.Text = "TEAM CHECKER: ON"
-        TeamToggle.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-    else
-        TeamToggle.Text = "TEAM CHECKER: OFF"
-        TeamToggle.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+FOVMinus.MouseButton1Click:Connect(function()
+    if FOVRadius > 30 then
+        FOVRadius = FOVRadius - 10
+        FOVLabel.Text = "FOV RADIUS: " .. tostring(FOVRadius)
+        FOVCircle.Radius = FOVRadius
     end
 end)
 
+FOVPlus.MouseButton1Click:Connect(function()
+    if FOVRadius < 400 then
+        FOVRadius = FOVRadius + 10
+        FOVLabel.Text = "FOV RADIUS: " .. tostring(FOVRadius)
+        FOVCircle.Radius = FOVRadius
+    end
+end)
+
+AimTeamToggle.MouseButton1Click:Connect(function()
+    TeamCheckActive = not TeamCheckActive
+    if TeamCheckActive then
+        AimTeamToggle.Text = "TEAM CHECKER: ON"
+        AimTeamToggle.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+    else
+        AimTeamToggle.Text = "TEAM CHECKER: OFF"
+        AimTeamToggle.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+    end
+end)
+
+local function GetInkGameTeam(player)
+    if not player or not player.Character then return "Unknown" end
+    local char = player.Character
+    
+    if char:FindFirstChild("Guard") or char:FindFirstChild("GuardMask") or char:FindFirstChild("Mask") or char:FindFirstChild("Suit") then
+        return "Guard"
+    end
+    
+    for _, child in ipairs(char:GetChildren()) do
+        if child:IsA("BasePart") or child:IsA("MeshPart") then
+            if child.Name == "Guard" or string.find(string.lower(child.Name), "mask") or string.find(string.lower(child.Name), "guard") then
+                return "Guard"
+            end
+        end
+        if child:IsA("Shirt") or child:IsA("Pants") then
+            local id = child.ShirtTemplate or child.PantsTemplate or ""
+            if string.find(string.lower(id), "guard") or string.find(string.lower(id), "pink") or string.find(string.lower(id), "red") then
+                return "Guard"
+            end
+        end
+    end
+    
+    local team = player.Team
+    if team then
+        local tName = string.lower(team.Name)
+        if string.find(tName, "guard") or string.find(tName, "staff") or string.find(tName, "pink") or string.find(tName, "red") then
+            return "Guard"
+        end
+        if string.find(tName, "player") or string.find(tName, "participant") or string.find(tName, "green") then
+            return "Player"
+        end
+    end
+    
+    return "Player"
+end
+
 local function IsEnemy(targetPlayer)
     if not TeamCheckActive then return true end
-    if not LocalPlayer.Team or not targetPlayer.Team then return true end
-    return LocalPlayer.Team ~= targetPlayer.Team
+    local myTeam = GetInkGameTeam(LocalPlayer)
+    local enemyTeam = GetInkGameTeam(targetPlayer)
+    return myTeam ~= enemyTeam
 end
 
-local function ClearTargetESP()
-    if CurrentHighlight then CurrentHighlight:Destroy() CurrentHighlight = nil end
+local function HasPriority(character)
+    if not character then return false, 0 end
+    local score = 0
+    local isPriority = false
+    
+    if character:FindFirstChildOfClass("Highlight") then
+        local hl = character:FindFirstChildOfClass("Highlight")
+        if hl.Enabled and (hl.FillColor == Color3.fromRGB(255, 0, 0) or hl.OutlineColor == Color3.fromRGB(255, 0, 0)) then
+            score = score + 5000
+            isPriority = true
+        end
+    end
+    
+    for _, child in ipairs(character:GetChildren()) do
+        if child:IsA("BillboardGui") or child:IsA("SurfaceGui") then
+            score = score + 3000
+            isPriority = true
+        end
+        if child.Name == "Attachment" and child:FindFirstChildOfClass("BillboardGui") then
+            score = score + 3000
+            isPriority = true
+        end
+        if child:IsA("BasePart") and child:FindFirstChildOfClass("SelectionBox") then
+            score = score + 4000
+            isPriority = true
+        end
+    end
+    
+    local head = character:FindFirstChild("Head")
+    if head then
+        for _, c in ipairs(head:GetChildren()) do
+            if c:IsA("BillboardGui") or c.Name == "Arrow" or c.Name == "Pointer" then
+                score = score + 4000
+                isPriority = true
+            end
+        end
+    end
+    
+    return isPriority, score
 end
 
+local function ClearTargetESP() if CurrentHighlight then CurrentHighlight:Destroy() CurrentHighlight = nil end end
 local function ApplyTargetESP(character)
     ClearTargetESP()
     if character and not FullESPActive then
@@ -368,11 +490,7 @@ local function ApplyTargetESP(character)
     end
 end
 
-local function ClearFullESP()
-    for _, hl in pairs(FullESPHighlights) do if hl then hl:Destroy() end end
-    FullESPHighlights = {}
-end
-
+local function ClearFullESP() for _, hl in pairs(FullESPHighlights) do if hl then hl:Destroy() end end FullESPHighlights = {} end
 local function UpdateFullESP()
     if not FullESPActive then ClearFullESP() return end
     for _, player in ipairs(Players:GetPlayers()) do
@@ -405,35 +523,12 @@ EspToggle.MouseButton1Click:Connect(function()
     end
 end)
 
-Players.PlayerRemoving:Connect(function(player)
-    if FullESPHighlights[player] then FullESPHighlights[player]:Destroy() FullESPHighlights[player] = nil end
-end)
+Players.PlayerRemoving:Connect(function(player) if FullESPHighlights[player] then FullESPHighlights[player]:Destroy() FullESPHighlights[player] = nil end end)
 
-local function HasPriority(char)
-    if char:FindFirstChildOfClass("Highlight") then return true end
-    for _, child in ipairs(char:GetChildren()) do
-        if child:IsA("Highlight") then return true end
-    end
-    local head = char:FindFirstChild("Head")
-    if head then
-        for _, c in ipairs(head:GetChildren()) do
-            if c:IsA("BillboardGui") or c:IsA("Attachment") then return true end
-        end
-    end
-    local hrp = char:FindFirstChild("HumanoidRootPart")
-    if hrp then
-        for _, c in ipairs(hrp:GetChildren()) do
-            if c:IsA("BillboardGui") or c:IsA("Attachment") or c:IsA("Decal") then return true end
-        end
-    end
-    return false
-end
-
-local function GetBestTarget()
-    local PriorityTarget = nil
-    local PriorityMaxScore = math.huge
-    local RegularTarget = nil
-    local RegularMaxScore = math.huge
+local function GetBestTarget(useFOV)
+    local BestTarget = nil
+    local MaxScore = math.huge
+    local Center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
     
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") and IsEnemy(player) then
@@ -443,47 +538,40 @@ local function GetBestTarget()
                 local ScreenPos, OnScreen = Camera:WorldToViewportPoint(EnemyRoot.Position)
                 local Dist = (LocalPlayer.Character.HumanoidRootPart.Position - EnemyRoot.Position).Magnitude
                 
-                local ScreenDist = 2000
                 if OnScreen then
-                    local MousePos = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-                    ScreenDist = (Vector2.new(ScreenPos.X, ScreenPos.Y) - MousePos).Magnitude
-                end
-                
-                local Score = ScreenDist + (Dist * 2)
-                if not OnScreen then Score = Score + 1500 end
-                
-                if HasPriority(player.Character) then
-                    if Score < PriorityMaxScore then PriorityMaxScore = Score PriorityTarget = player.Character end
-                else
-                    if Score < RegularMaxScore then RegularMaxScore = Score RegularTarget = player.Character end
+                    local ScreenDist = (Vector2.new(ScreenPos.X, ScreenPos.Y) - Center).Magnitude
+                    
+                    if not useFOV or (useFOV and ScreenDist <= FOVRadius) then
+                        local hasPrio, prioScore = HasPriority(player.Character)
+                        local Score = ScreenDist + (Dist * 1.5) - prioScore
+                        
+                        if Score < MaxScore then
+                            MaxScore = Score
+                            BestTarget = player.Character
+                        end
+                    end
+                elseif not useFOV then
+                    local hasPrio, prioScore = HasPriority(player.Character)
+                    local Score = 2000 + Dist - prioScore
+                    if Score < MaxScore then
+                        MaxScore = Score
+                        BestTarget = player.Character
+                    end
                 end
             end
         end
     end
-    return PriorityTarget or RegularTarget
-end
-
-local function SyncUI(state)
-    if state then
-        ToggleButton.Text = "CAMLOCK: ON"
-        ToggleButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-        AimToggleButton.Text = "AIMBOT LOCK: ON"
-        AimToggleButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-    else
-        ToggleButton.Text = "CAMLOCK: OFF"
-        ToggleButton.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-        AimToggleButton.Text = "AIMBOT LOCK: OFF"
-        AimToggleButton.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-    end
+    return BestTarget
 end
 
 local function StartLock()
     if Connection then Connection:Disconnect() end
-    Camera.CameraType = Enum.CameraType.Scriptable
     
     Connection = RunService.RenderStepped:Connect(function()
         if FullESPActive then UpdateFullESP() end
-        if not IsActive then
+        FOVCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+        
+        if not IsActive and not AimbotActive then
             if Connection then Connection:Disconnect() end
             Camera.CameraType = Enum.CameraType.Custom
             ClearTargetESP()
@@ -494,23 +582,30 @@ local function StartLock()
         if Target and Target:FindFirstChild(LockPart) then
             local targetPlayer = Players:GetPlayerFromCharacter(Target)
             local Hum = Target:FindFirstChildOfClass("Humanoid")
-            if Hum and Hum.Health > 0 and targetPlayer and IsEnemy(targetPlayer) then IsTargetValid = true end
-        end
-        
-        if IsTargetValid and not HasPriority(Target) then
-            local bestNow = GetBestTarget()
-            if bestNow and HasPriority(bestNow) then IsTargetValid = false end
+            if Hum and Hum.Health > 0 and targetPlayer and IsEnemy(targetPlayer) then
+                if AimbotActive then
+                    local ScreenPos, OnScreen = Camera:WorldToViewportPoint(Target[LockPart].Position)
+                    if OnScreen then
+                        local Center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+                        local ScreenDist = (Vector2.new(ScreenPos.X, ScreenPos.Y) - Center).Magnitude
+                        if ScreenDist <= FOVRadius then
+                            IsTargetValid = true
+                        end
+                    end
+                else
+                    IsTargetValid = true
+                end
+            end
         end
         
         if not IsTargetValid then
-            Target = GetBestTarget()
+            Target = GetBestTarget(AimbotActive)
             if not Target then
-                Camera.CameraType = Enum.CameraType.Custom
+                if IsActive then Camera.CameraType = Enum.CameraType.Custom end
                 ClearTargetESP()
-                return
             else
-                Camera.CameraType = Enum.CameraType.Scriptable
-                ApplyTargetESP(Target)
+                if IsActive then Camera.CameraType = Enum.CameraType.Scriptable end
+                if not AimbotActive then ApplyTargetESP(Target) end
             end
         end
         
@@ -519,39 +614,82 @@ local function StartLock()
             local EnemyPart = Target[LockPart]
             local MyPos = MyRoot.Position
             local EnemyPos = EnemyPart.Position
-            local Direction = (MyPos - EnemyPos).Unit
-            local TargetCamPos = MyPos + (Direction * CamDistance) + Vector3.new(0, 4, 0)
             
-            Camera.Focus = EnemyPart.CFrame
-            if Smoothness == 1 then
-                Camera.CFrame = CFrame.lookAt(TargetCamPos, EnemyPos)
-            else
-                Camera.CFrame = Camera.CFrame:Lerp(CFrame.lookAt(TargetCamPos, EnemyPos), Smoothness)
-            end
-            
-            local LookVector = Vector3.new(EnemyPos.X, MyPos.Y, EnemyPos.Z)
-            MyRoot.CFrame = MyRoot.CFrame:Lerp(CFrame.lookAt(MyPos, LookVector), Smoothness)
-            
-            if not FullESPActive then
-                if not CurrentHighlight or CurrentHighlight.Parent ~= Target then ApplyTargetESP(Target) end
+            if IsActive then
+                local Direction = (MyPos - EnemyPos).Unit
+                local TargetCamPos = MyPos + (Direction * CamDistance) + Vector3.new(0, 4, 0)
+                Camera.Focus = EnemyPart.CFrame
+                
+                if Smoothness == 1 then
+                    Camera.CFrame = CFrame.lookAt(TargetCamPos, EnemyPos)
+                else
+                    Camera.CFrame = Camera.CFrame:Lerp(CFrame.lookAt(TargetCamPos, EnemyPos), Smoothness)
+                end
+                
+                local LookVector = Vector3.new(EnemyPos.X, MyPos.Y, EnemyPos.Z)
+                MyRoot.CFrame = MyRoot.CFrame:Lerp(CFrame.lookAt(MyPos, LookVector), Smoothness)
+                
+                if not FullESPActive then
+                    if not CurrentHighlight or CurrentHighlight.Parent ~= Target then
+                        ApplyTargetESP(Target)
+                    end
+                end
+            elseif AimbotActive then
+                local ScreenPos, OnScreen = Camera:WorldToViewportPoint(EnemyPos)
+                if OnScreen then
+                    local Center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+                    local MousePos = UserInputService:GetMouseLocation()
+                    local Diff = (Vector2.new(ScreenPos.X, ScreenPos.Y) - MousePos)
+                    
+                    if typeof(mousemoverel) == "function" then
+                        mousemoverel(Diff.X * 0.25, Diff.Y * 0.25)
+                    end
+                end
             end
         end
     end)
 end
 
-local function ToggleState()
+ToggleButton.MouseButton1Click:Connect(function()
     IsActive = not IsActive
-    SyncUI(IsActive)
     if IsActive then
-        Target = GetBestTarget()
+        AimbotActive = false
+        AimButton.Text = "AIMBOT: OFF"
+        AimButton.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+        FOVCircle.Visible = false
+        
+        Target = GetBestTarget(false)
+        ToggleButton.Text = "CAMLOCK: ON"
+        ToggleButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
         if Target then ApplyTargetESP(Target) end
         StartLock()
     else
         Target = nil
+        ToggleButton.Text = "CAMLOCK: OFF"
+        ToggleButton.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
         Camera.CameraType = Enum.CameraType.Custom
         ClearTargetESP()
     end
-end
+end)
 
-ToggleButton.MouseButton1Click:Connect(ToggleState)
-AimToggleButton.MouseButton1Click:Connect(ToggleState)
+AimButton.MouseButton1Click:Connect(function()
+    AimbotActive = not AimbotActive
+    if AimbotActive then
+        IsActive = false
+        ToggleButton.Text = "CAMLOCK: OFF"
+        ToggleButton.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+        Camera.CameraType = Enum.CameraType.Custom
+        ClearTargetESP()
+        
+        AimButton.Text = "AIMBOT: ON"
+        AimButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+        FOVCircle.Visible = true
+        Target = GetBestTarget(true)
+        StartLock()
+    else
+        Target = nil
+        AimButton.Text = "AIMBOT: OFF"
+        AimButton.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+        FOVCircle.Visible = false
+    end
+end) 
