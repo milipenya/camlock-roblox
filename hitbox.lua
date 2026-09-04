@@ -1,5 +1,5 @@
 --// COMBAT ADMIN PANEL
---// Put this LocalScript into StarterPlayer > StarterPlayerScripts
+--// LocalScript -> StarterPlayer > StarterPlayerScripts
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -7,6 +7,7 @@ local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 
 local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 local Camera = workspace.CurrentCamera
 
 --==================================================
@@ -15,9 +16,6 @@ local Camera = workspace.CurrentCamera
 
 local Settings = {
 	Aimbot = false,
-
-	ESP = true,
-	Markers = true,
 
 	PlayerHitbox = 2.5,
 	NpcHitbox = 2,
@@ -38,25 +36,53 @@ local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "CombatAdminPanel"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+ScreenGui.Parent = PlayerGui
+
+-- OPEN BUTTON
+
+local OpenButton = Instance.new("TextButton")
+OpenButton.Name = "OpenCombat"
+OpenButton.Size = UDim2.fromOffset(48, 48)
+OpenButton.Position = UDim2.new(0, 20, 0.5, -24)
+OpenButton.BackgroundColor3 = Color3.fromRGB(10, 10, 12)
+OpenButton.Text = "⚔"
+OpenButton.TextColor3 = Color3.fromRGB(255, 50, 110)
+OpenButton.TextSize = 24
+OpenButton.Font = Enum.Font.GothamBold
+OpenButton.AutoButtonColor = false
+OpenButton.Parent = ScreenGui
+
+local OpenCorner = Instance.new("UICorner")
+OpenCorner.CornerRadius = UDim.new(0, 12)
+OpenCorner.Parent = OpenButton
+
+local OpenStroke = Instance.new("UIStroke")
+OpenStroke.Color = Color3.fromRGB(255, 40, 100)
+OpenStroke.Thickness = 1.5
+OpenStroke.Parent = OpenButton
+
+-- MAIN
 
 local Main = Instance.new("Frame")
 Main.Name = "Main"
 Main.Size = UDim2.fromOffset(310, 500)
-Main.Position = UDim2.new(0, 30, 0.5, -250)
+Main.Position = UDim2.new(0, 80, 0.5, -250)
 Main.BackgroundColor3 = Color3.fromRGB(8, 8, 10)
 Main.BorderSizePixel = 0
+Main.Visible = true
 Main.Parent = ScreenGui
 
-local Corner = Instance.new("UICorner")
-Corner.CornerRadius = UDim.new(0, 14)
-Corner.Parent = Main
+local MainCorner = Instance.new("UICorner")
+MainCorner.CornerRadius = UDim.new(0, 14)
+MainCorner.Parent = Main
 
-local Stroke = Instance.new("UIStroke")
-Stroke.Color = Color3.fromRGB(255, 40, 100)
-Stroke.Thickness = 1.5
-Stroke.Transparency = 0.25
-Stroke.Parent = Main
+local MainStroke = Instance.new("UIStroke")
+MainStroke.Color = Color3.fromRGB(255, 40, 100)
+MainStroke.Thickness = 1.5
+MainStroke.Transparency = 0.2
+MainStroke.Parent = Main
+
+-- HEADER
 
 local Header = Instance.new("Frame")
 Header.Size = UDim2.new(1, 0, 0, 55)
@@ -105,6 +131,8 @@ local CloseCorner = Instance.new("UICorner")
 CloseCorner.CornerRadius = UDim.new(0, 9)
 CloseCorner.Parent = Close
 
+-- CONTENT
+
 local Content = Instance.new("ScrollingFrame")
 Content.Position = UDim2.fromOffset(10, 65)
 Content.Size = UDim2.new(1, -20, 1, -75)
@@ -126,11 +154,21 @@ Padding.PaddingRight = UDim.new(0, 3)
 Padding.PaddingBottom = UDim.new(0, 10)
 Padding.Parent = Content
 
+Layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+	Content.CanvasSize = UDim2.new(
+		0,
+		0,
+		0,
+		Layout.AbsoluteContentSize.Y + 15
+	)
+end)
+
 --==================================================
 -- BUTTON CREATOR
 --==================================================
 
 local function createButton(text)
+
 	local Button = Instance.new("TextButton")
 
 	Button.Size = UDim2.new(1, -6, 0, 42)
@@ -156,7 +194,7 @@ local function createButton(text)
 	Button.MouseEnter:Connect(function()
 		TweenService:Create(
 			Button,
-			TweenInfo.new(0.15),
+			TweenInfo.new(0.12),
 			{
 				BackgroundColor3 = Color3.fromRGB(35, 20, 27)
 			}
@@ -166,7 +204,7 @@ local function createButton(text)
 	Button.MouseLeave:Connect(function()
 		TweenService:Create(
 			Button,
-			TweenInfo.new(0.15),
+			TweenInfo.new(0.12),
 			{
 				BackgroundColor3 = Color3.fromRGB(18, 18, 21)
 			}
@@ -181,6 +219,7 @@ end
 --==================================================
 
 local function isEnemy(player)
+
 	if player == LocalPlayer then
 		return false
 	end
@@ -189,14 +228,14 @@ local function isEnemy(player)
 		return false
 	end
 
-	local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+	local humanoid =
+		player.Character:FindFirstChildOfClass("Humanoid")
 
 	if not humanoid or humanoid.Health <= 0 then
 		return false
 	end
 
-	-- Team check
-	if LocalPlayer.Team ~= nil and player.Team ~= nil then
+	if LocalPlayer.Team and player.Team then
 		return LocalPlayer.Team ~= player.Team
 	end
 
@@ -204,151 +243,91 @@ local function isEnemy(player)
 end
 
 --==================================================
--- ESP
+-- SYSTEM ESP DETECTOR
 --==================================================
 
-local function removeEnemyESP(player)
-	if not player.Character then
-		return
+local function isRedColor(color)
+
+	if not color then
+		return false
 	end
+
+	-- Red must clearly dominate green/blue
+	return color.R > 0.65
+		and color.R > color.G * 1.8
+		and color.R > color.B * 1.8
+end
+
+local function hasSystemRedESP(player)
 
 	local character = player.Character
-	local root = character:FindFirstChild("HumanoidRootPart")
 
-	local highlight = character:FindFirstChild("AdminEnemyESP")
-
-	if highlight then
-		highlight:Destroy()
+	if not character then
+		return false
 	end
 
-	if root then
-		local marker = root:FindFirstChild("AdminEnemyMarker")
+	--==============================================
+	-- LOOK FOR HIGHLIGHT
+	--==============================================
 
-		if marker then
-			marker:Destroy()
+	for _, object in ipairs(character:GetDescendants()) do
+
+		if object:IsA("Highlight") then
+
+			local fillRed =
+				isRedColor(object.FillColor)
+
+			local outlineRed =
+				isRedColor(object.OutlineColor)
+
+			if fillRed or outlineRed then
+				return true
+			end
 		end
 	end
 
-	-- VERY IMPORTANT:
-	-- no ESP = no aimbot target
-	character:SetAttribute("AdminAimTarget", false)
-end
+	--==============================================
+	-- LOOK FOR RED BILLBOARD / MARKER
+	--==============================================
 
-local function createEnemyESP(player)
-	if not player.Character then
-		return
-	end
+	for _, object in ipairs(character:GetDescendants()) do
 
-	local character = player.Character
-	local root = character:FindFirstChild("HumanoidRootPart")
+		if object:IsA("BillboardGui") then
 
-	if not root then
-		return
-	end
+			for _, child in ipairs(object:GetDescendants()) do
 
-	-- Clean old ESP
-	removeEnemyESP(player)
+				if child:IsA("TextLabel") then
 
-	-- If ESP is disabled, don't mark the player
-	if not Settings.ESP then
-		return
-	end
+					if isRedColor(child.TextColor3) then
 
-	if not isEnemy(player) then
-		return
-	end
-
-	--==================================================
-	-- RED HIGHLIGHT
-	--==================================================
-
-	local highlight = Instance.new("Highlight")
-	highlight.Name = "AdminEnemyESP"
-	highlight.Adornee = character
-
-	highlight.FillColor = Color3.fromRGB(255, 0, 0)
-	highlight.OutlineColor = Color3.fromRGB(255, 0, 0)
-
-	highlight.FillTransparency = 0.78
-	highlight.OutlineTransparency = 0
-
-	highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-
-	highlight.Parent = character
-
-	--==================================================
-	-- RED ARROW
-	--==================================================
-
-	if Settings.Markers then
-		local marker = Instance.new("BillboardGui")
-
-		marker.Name = "AdminEnemyMarker"
-		marker.Adornee = root
-		marker.Size = UDim2.fromOffset(65, 65)
-		marker.StudsOffset = Vector3.new(0, 4.5, 0)
-		marker.AlwaysOnTop = true
-
-		marker.Parent = root
-
-		local arrow = Instance.new("TextLabel")
-
-		arrow.BackgroundTransparency = 1
-		arrow.Size = UDim2.fromScale(1, 1)
-
-		arrow.Text = "▼"
-		arrow.TextColor3 = Color3.fromRGB(255, 0, 0)
-		arrow.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-		arrow.TextStrokeTransparency = 0
-
-		arrow.TextScaled = true
-		arrow.Font = Enum.Font.GothamBold
-
-		arrow.Parent = marker
-	end
-
-	--==================================================
-	-- AIM PERMISSION
-	--==================================================
-
-	-- THIS IS THE IMPORTANT PART.
-	-- Only players currently marked by our ESP
-	-- can be selected by the aimbot.
-
-	character:SetAttribute("AdminAimTarget", true)
-end
-
-local function updateAllESP()
-	for _, player in ipairs(Players:GetPlayers()) do
-		if player ~= LocalPlayer then
-			createEnemyESP(player)
+						-- Don't require a specific name.
+						return true
+					end
+				end
+			end
 		end
 	end
+
+	return false
 end
 
 --==================================================
 -- AIM TARGET
 --==================================================
 
-local function isMarkedEnemy(player)
-	if not player.Character then
-		return false
-	end
+local function isValidAimTarget(player)
 
 	if not isEnemy(player) then
 		return false
 	end
 
-	-- Aimbot ONLY accepts players marked by our ESP.
-	if player.Character:GetAttribute("AdminAimTarget") ~= true then
-		return false
-	end
+	-- THE IMPORTANT PART:
+	--
+	-- The aimbot does NOT create its own ESP.
+	-- It only checks whether the existing
+	-- SYSTEM ESP is currently visible on the player.
 
-	-- Extra safety check:
-	-- the actual red Highlight must exist.
-	local highlight = player.Character:FindFirstChild("AdminEnemyESP")
-
-	if not highlight then
+	if not hasSystemRedESP(player) then
 		return false
 	end
 
@@ -356,16 +335,22 @@ local function isMarkedEnemy(player)
 end
 
 local function getAimPart(character)
+
 	if not character then
 		return nil
 	end
 
 	if Settings.AimPart == "Head" then
+
 		return character:FindFirstChild("Head")
+
 	elseif Settings.AimPart == "Torso" then
+
 		return character:FindFirstChild("UpperTorso")
 			or character:FindFirstChild("Torso")
+
 	elseif Settings.AimPart == "HumanoidRootPart" then
+
 		return character:FindFirstChild("HumanoidRootPart")
 	end
 
@@ -373,6 +358,7 @@ local function getAimPart(character)
 end
 
 local function getAimTarget()
+
 	local closest = nil
 	local closestDistance = Settings.AimRange
 
@@ -385,12 +371,14 @@ local function getAimTarget()
 
 	for _, player in ipairs(Players:GetPlayers()) do
 
-		-- THIS FILTER IS THE KEY.
-		-- Non-red-ESP players are completely ignored.
-		if isMarkedEnemy(player) then
+		-- Only players with the SYSTEM RED ESP
+		-- are even considered.
+
+		if isValidAimTarget(player) then
 
 			local character = player.Character
-			local humanoid = character:FindFirstChildOfClass("Humanoid")
+			local humanoid =
+				character:FindFirstChildOfClass("Humanoid")
 
 			if humanoid and humanoid.Health > 0 then
 
@@ -399,21 +387,26 @@ local function getAimTarget()
 				if part then
 
 					local screenPosition, visible =
-						Camera:WorldToViewportPoint(part.Position)
+						Camera:WorldToViewportPoint(
+							part.Position
+						)
 
 					if visible and screenPosition.Z > 0 then
 
-						local screenPoint = Vector2.new(
-							screenPosition.X,
-							screenPosition.Y
-						)
+						local screenPoint =
+							Vector2.new(
+								screenPosition.X,
+								screenPosition.Y
+							)
 
 						local distance =
 							(screenPoint - center).Magnitude
 
 						if distance < closestDistance then
+
 							closestDistance = distance
 							closest = part
+
 						end
 					end
 				end
@@ -425,203 +418,66 @@ local function getAimTarget()
 end
 
 --==================================================
--- PLAYER HITBOXES
+-- AIMBOT BUTTON
 --==================================================
 
-local PlayerHitboxObjects = {}
-
-local function createHitbox(player)
-	if not player.Character then
-		return
-	end
-
-	local character = player.Character
-	local root = character:FindFirstChild("HumanoidRootPart")
-
-	if not root then
-		return
-	end
-
-	if PlayerHitboxObjects[player] then
-		PlayerHitboxObjects[player]:Destroy()
-		PlayerHitboxObjects[player] = nil
-	end
-
-	if not Settings.ShowPlayerHitboxes then
-		return
-	end
-
-	local adornment = Instance.new("BoxHandleAdornment")
-
-	adornment.Name = "AdminPlayerHitbox"
-	adornment.Adornee = root
-
-	adornment.Size = root.Size * Settings.PlayerHitbox
-
-	adornment.Color3 = Color3.fromRGB(255, 50, 100)
-	adornment.Transparency = 0.75
-
-	adornment.AlwaysOnTop = true
-	adornment.ZIndex = 5
-
-	adornment.Parent = root
-
-	PlayerHitboxObjects[player] = adornment
-end
-
-local function updatePlayerHitboxes()
-	for _, player in ipairs(Players:GetPlayers()) do
-		if player ~= LocalPlayer then
-			createHitbox(player)
-		end
-	end
-end
-
---==================================================
--- NPC HITBOXES
---==================================================
-
-local NpcHitboxObjects = {}
-
-local function isNPC(model)
-	if not model:IsA("Model") then
-		return false
-	end
-
-	if Players:GetPlayerFromCharacter(model) then
-		return false
-	end
-
-	local humanoid = model:FindFirstChildOfClass("Humanoid")
-	local root = model:FindFirstChild("HumanoidRootPart")
-
-	return humanoid ~= nil and root ~= nil
-end
-
-local function updateNpcHitboxes()
-	-- Remove old
-	for model, object in pairs(NpcHitboxObjects) do
-		if object and object.Parent then
-			object:Destroy()
-		end
-
-		NpcHitboxObjects[model] = nil
-	end
-
-	if not Settings.ShowNpcHitboxes then
-		return
-	end
-
-	for _, object in ipairs(workspace:GetDescendants()) do
-
-		if isNPC(object) then
-
-			local root = object:FindFirstChild("HumanoidRootPart")
-
-			if root then
-
-				local adornment = Instance.new("BoxHandleAdornment")
-
-				adornment.Name = "AdminNPCHitbox"
-				adornment.Adornee = root
-
-				adornment.Size =
-					root.Size * Settings.NpcHitbox
-
-				adornment.Color3 =
-					Color3.fromRGB(255, 50, 100)
-
-				adornment.Transparency = 0.75
-
-				adornment.AlwaysOnTop = true
-				adornment.ZIndex = 5
-
-				adornment.Parent = root
-
-				NpcHitboxObjects[object] = adornment
-			end
-		end
-	end
-end
-
---==================================================
--- BUTTONS
---==================================================
-
-local AimbotButton = createButton("AIMBOT: OFF")
+local AimbotButton =
+	createButton("AIMBOT: OFF")
 
 AimbotButton.MouseButton1Click:Connect(function()
 
 	Settings.Aimbot = not Settings.Aimbot
 
 	if Settings.Aimbot then
+
 		AimbotButton.Text = "AIMBOT: ON"
-		AimbotButton.TextColor3 = Color3.fromRGB(255, 50, 110)
+		AimbotButton.TextColor3 =
+			Color3.fromRGB(255, 50, 110)
+
 	else
+
 		AimbotButton.Text = "AIMBOT: OFF"
-		AimbotButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+		AimbotButton.TextColor3 =
+			Color3.fromRGB(255, 255, 255)
 	end
 end)
 
-local ESPButton = createButton("ENEMY ESP: ON")
+--==================================================
+-- AIM PART
+--==================================================
 
-ESPButton.MouseButton1Click:Connect(function()
-
-	Settings.ESP = not Settings.ESP
-
-	if Settings.ESP then
-		ESPButton.Text = "ENEMY ESP: ON"
-		ESPButton.TextColor3 = Color3.fromRGB(255, 50, 110)
-
-		updateAllESP()
-	else
-		ESPButton.Text = "ENEMY ESP: OFF"
-		ESPButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-
-		-- Removing ESP also removes aim permission
-		for _, player in ipairs(Players:GetPlayers()) do
-			if player ~= LocalPlayer then
-				removeEnemyESP(player)
-			end
-		end
-	end
-end)
-
-local MarkerButton = createButton("ENEMY MARKERS: ON")
-
-MarkerButton.MouseButton1Click:Connect(function()
-
-	Settings.Markers = not Settings.Markers
-
-	if Settings.Markers then
-		MarkerButton.Text = "ENEMY MARKERS: ON"
-		MarkerButton.TextColor3 = Color3.fromRGB(255, 50, 110)
-	else
-		MarkerButton.Text = "ENEMY MARKERS: OFF"
-		MarkerButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-	end
-
-	updateAllESP()
-end)
-
-local AimPartButton = createButton("AIM PART: HEAD")
+local AimPartButton =
+	createButton("AIM PART: HEAD")
 
 AimPartButton.MouseButton1Click:Connect(function()
 
 	if Settings.AimPart == "Head" then
+
 		Settings.AimPart = "Torso"
+
 	elseif Settings.AimPart == "Torso" then
+
 		Settings.AimPart = "HumanoidRootPart"
+
 	else
+
 		Settings.AimPart = "Head"
 	end
 
 	AimPartButton.Text =
-		"AIM PART: " .. string.upper(Settings.AimPart)
+		"AIM PART: "
+		.. string.upper(Settings.AimPart)
 end)
 
+--==================================================
+-- SMOOTH
+--==================================================
+
 local SmoothButton =
-	createButton("AIM SMOOTH: " .. tostring(Settings.AimSmoothness))
+	createButton(
+		"AIM SMOOTH: "
+			.. tostring(Settings.AimSmoothness)
+	)
 
 SmoothButton.MouseButton1Click:Connect(function()
 
@@ -635,11 +491,76 @@ SmoothButton.MouseButton1Click:Connect(function()
 		math.floor(Settings.AimSmoothness * 100) / 100
 
 	SmoothButton.Text =
-		"AIM SMOOTH: " .. tostring(Settings.AimSmoothness)
+		"AIM SMOOTH: "
+		.. tostring(Settings.AimSmoothness)
 end)
 
+--==================================================
+-- PLAYER HITBOX
+--==================================================
+
+local PlayerHitboxObjects = {}
+
+local function createHitbox(player)
+
+	if not player.Character then
+		return
+	end
+
+	local root =
+		player.Character:FindFirstChild(
+			"HumanoidRootPart"
+		)
+
+	if not root then
+		return
+	end
+
+	if PlayerHitboxObjects[player] then
+
+		PlayerHitboxObjects[player]:Destroy()
+		PlayerHitboxObjects[player] = nil
+	end
+
+	if not Settings.ShowPlayerHitboxes then
+		return
+	end
+
+	local box =
+		Instance.new("BoxHandleAdornment")
+
+	box.Name = "AdminPlayerHitbox"
+	box.Adornee = root
+	box.Size =
+		root.Size * Settings.PlayerHitbox
+
+	box.Color3 =
+		Color3.fromRGB(255, 50, 100)
+
+	box.Transparency = 0.75
+	box.AlwaysOnTop = true
+	box.ZIndex = 5
+
+	box.Parent = root
+
+	PlayerHitboxObjects[player] = box
+end
+
+local function updatePlayerHitboxes()
+
+	for _, player in ipairs(Players:GetPlayers()) do
+
+		if player ~= LocalPlayer then
+			createHitbox(player)
+		end
+	end
+end
+
 local PlayerHitboxButton =
-	createButton("PLAYER HITBOX: x" .. Settings.PlayerHitbox)
+	createButton(
+		"PLAYER HITBOX: x"
+			.. Settings.PlayerHitbox
+	)
 
 PlayerHitboxButton.MouseButton1Click:Connect(function()
 
@@ -650,13 +571,16 @@ PlayerHitboxButton.MouseButton1Click:Connect(function()
 	end
 
 	PlayerHitboxButton.Text =
-		"PLAYER HITBOX: x" .. Settings.PlayerHitbox
+		"PLAYER HITBOX: x"
+			.. Settings.PlayerHitbox
 
 	updatePlayerHitboxes()
 end)
 
 local ShowPlayerButton =
-	createButton("SHOW PLAYER HITBOXES: OFF")
+	createButton(
+		"SHOW PLAYER HITBOXES: OFF"
+	)
 
 ShowPlayerButton.MouseButton1Click:Connect(function()
 
@@ -664,12 +588,15 @@ ShowPlayerButton.MouseButton1Click:Connect(function()
 		not Settings.ShowPlayerHitboxes
 
 	if Settings.ShowPlayerHitboxes then
+
 		ShowPlayerButton.Text =
 			"SHOW PLAYER HITBOXES: ON"
 
 		ShowPlayerButton.TextColor3 =
 			Color3.fromRGB(255, 50, 110)
+
 	else
+
 		ShowPlayerButton.Text =
 			"SHOW PLAYER HITBOXES: OFF"
 
@@ -680,8 +607,97 @@ ShowPlayerButton.MouseButton1Click:Connect(function()
 	updatePlayerHitboxes()
 end)
 
+--==================================================
+-- NPC HITBOX
+--==================================================
+
+local NpcHitboxObjects = {}
+
+local function isNPC(model)
+
+	if not model:IsA("Model") then
+		return false
+	end
+
+	if Players:GetPlayerFromCharacter(model) then
+		return false
+	end
+
+	local humanoid =
+		model:FindFirstChildOfClass("Humanoid")
+
+	local root =
+		model:FindFirstChild("HumanoidRootPart")
+
+	return humanoid ~= nil and root ~= nil
+end
+
+local function updateNpcHitboxes()
+
+	for model, object in pairs(NpcHitboxObjects) do
+
+		if object then
+			object:Destroy()
+		end
+
+		NpcHitboxObjects[model] = nil
+	end
+
+	if not Settings.ShowNpcHitboxes then
+		return
+	end
+
+	for _, object in ipairs(
+		workspace:GetDescendants()
+	) do
+
+		if isNPC(object) then
+
+			local root =
+				object:FindFirstChild(
+					"HumanoidRootPart"
+				)
+
+			if root then
+
+				local box =
+					Instance.new(
+						"BoxHandleAdornment"
+					)
+
+				box.Name =
+					"AdminNPCHitbox"
+
+				box.Adornee = root
+
+				box.Size =
+					root.Size * Settings.NpcHitbox
+
+				box.Color3 =
+					Color3.fromRGB(
+						255,
+						50,
+						100
+					)
+
+				box.Transparency = 0.75
+				box.AlwaysOnTop = true
+				box.ZIndex = 5
+
+				box.Parent = root
+
+				NpcHitboxObjects[object] =
+					box
+			end
+		end
+	end
+end
+
 local NpcHitboxButton =
-	createButton("NPC HITBOX: x" .. Settings.NpcHitbox)
+	createButton(
+		"NPC HITBOX: x"
+			.. Settings.NpcHitbox
+	)
 
 NpcHitboxButton.MouseButton1Click:Connect(function()
 
@@ -692,13 +708,16 @@ NpcHitboxButton.MouseButton1Click:Connect(function()
 	end
 
 	NpcHitboxButton.Text =
-		"NPC HITBOX: x" .. Settings.NpcHitbox
+		"NPC HITBOX: x"
+			.. Settings.NpcHitbox
 
 	updateNpcHitboxes()
 end)
 
 local ShowNpcButton =
-	createButton("SHOW NPC HITBOXES: OFF")
+	createButton(
+		"SHOW NPC HITBOXES: OFF"
+	)
 
 ShowNpcButton.MouseButton1Click:Connect(function()
 
@@ -706,12 +725,15 @@ ShowNpcButton.MouseButton1Click:Connect(function()
 		not Settings.ShowNpcHitboxes
 
 	if Settings.ShowNpcHitboxes then
+
 		ShowNpcButton.Text =
 			"SHOW NPC HITBOXES: ON"
 
 		ShowNpcButton.TextColor3 =
 			Color3.fromRGB(255, 50, 110)
+
 	else
+
 		ShowNpcButton.Text =
 			"SHOW NPC HITBOXES: OFF"
 
@@ -722,15 +744,23 @@ ShowNpcButton.MouseButton1Click:Connect(function()
 	updateNpcHitboxes()
 end)
 
-local ResetButton = createButton("RESET HITBOXES")
+--==================================================
+-- RESET
+--==================================================
+
+local ResetButton =
+	createButton("RESET HITBOXES")
 
 ResetButton.MouseButton1Click:Connect(function()
 
 	Settings.PlayerHitbox = 1
 	Settings.NpcHitbox = 1
 
-	PlayerHitboxButton.Text = "PLAYER HITBOX: x1"
-	NpcHitboxButton.Text = "NPC HITBOX: x1"
+	PlayerHitboxButton.Text =
+		"PLAYER HITBOX: x1"
+
+	NpcHitboxButton.Text =
+		"NPC HITBOX: x1"
 
 	updatePlayerHitboxes()
 	updateNpcHitboxes()
@@ -747,25 +777,31 @@ local function setupPlayer(player)
 	end
 
 	player.CharacterAdded:Connect(function()
+
 		task.wait(0.5)
 
-		createEnemyESP(player)
 		createHitbox(player)
 	end)
 
 	if player.Character then
+
 		task.defer(function()
-			createEnemyESP(player)
 			createHitbox(player)
 		end)
 	end
 
-	player:GetPropertyChangedSignal("Team"):Connect(function()
-		createEnemyESP(player)
+	player:GetPropertyChangedSignal(
+		"Team"
+	):Connect(function()
+		-- Nothing else needed.
+		-- System ESP remains the source of truth.
 	end)
 end
 
-for _, player in ipairs(Players:GetPlayers()) do
+for _, player in ipairs(
+	Players:GetPlayers()
+) do
+
 	setupPlayer(player)
 end
 
@@ -774,7 +810,9 @@ Players.PlayerAdded:Connect(setupPlayer)
 Players.PlayerRemoving:Connect(function(player)
 
 	if PlayerHitboxObjects[player] then
+
 		PlayerHitboxObjects[player]:Destroy()
+
 		PlayerHitboxObjects[player] = nil
 	end
 end)
@@ -792,17 +830,16 @@ RunService:BindToRenderStep(
 			return
 		end
 
-		local target = getAimTarget()
+		local target =
+			getAimTarget()
 
 		if not target then
 			return
 		end
 
-		local cameraPosition = Camera.CFrame.Position
-
 		local targetCFrame =
 			CFrame.lookAt(
-				cameraPosition,
+				Camera.CFrame.Position,
 				target.Position
 			)
 
@@ -824,8 +861,10 @@ local startPosition
 
 Header.InputBegan:Connect(function(input)
 
-	if input.UserInputType == Enum.UserInputType.MouseButton1
-		or input.UserInputType == Enum.UserInputType.Touch then
+	if input.UserInputType ==
+		Enum.UserInputType.MouseButton1
+		or input.UserInputType ==
+		Enum.UserInputType.Touch then
 
 		dragging = true
 		dragStart = input.Position
@@ -835,8 +874,10 @@ end)
 
 Header.InputEnded:Connect(function(input)
 
-	if input.UserInputType == Enum.UserInputType.MouseButton1
-		or input.UserInputType == Enum.UserInputType.Touch then
+	if input.UserInputType ==
+		Enum.UserInputType.MouseButton1
+		or input.UserInputType ==
+		Enum.UserInputType.Touch then
 
 		dragging = false
 	end
@@ -848,16 +889,20 @@ UserInputService.InputChanged:Connect(function(input)
 		return
 	end
 
-	if input.UserInputType ~= Enum.UserInputType.MouseMovement
-		and input.UserInputType ~= Enum.UserInputType.Touch then
+	if input.UserInputType ~=
+		Enum.UserInputType.MouseMovement
+		and input.UserInputType ~=
+		Enum.UserInputType.Touch then
 		return
 	end
 
-	local delta = input.Position - dragStart
+	local delta =
+		input.Position - dragStart
 
 	Main.Position = UDim2.new(
 		startPosition.X.Scale,
 		startPosition.X.Offset + delta.X,
+
 		startPosition.Y.Scale,
 		startPosition.Y.Offset + delta.Y
 	)
@@ -867,83 +912,143 @@ end)
 -- OPEN / CLOSE
 --==================================================
 
-local isOpen = true
+local function openPanel()
 
-Close.MouseButton1Click:Connect(function()
+	Main.Visible = true
 
-	isOpen = false
+	Main.Size =
+		UDim2.fromOffset(310, 0)
 
 	TweenService:Create(
 		Main,
 		TweenInfo.new(
 			0.25,
-			Enum.EasingStyle.Quad,
-			Enum.EasingDirection.In
+			Enum.EasingStyle.Back,
+			Enum.EasingDirection.Out
 		),
 		{
-			Size = UDim2.fromOffset(310, 0)
+			Size = UDim2.fromOffset(
+				310,
+				500
+			)
 		}
 	):Play()
+end
 
-	task.wait(0.25)
+local function closePanel()
 
-	Main.Visible = false
+	local tween =
+		TweenService:Create(
+			Main,
+			TweenInfo.new(
+				0.2,
+				Enum.EasingStyle.Quad,
+				Enum.EasingDirection.In
+			),
+			{
+				Size = UDim2.fromOffset(
+					310,
+					0
+				)
+			}
+		)
+
+	tween:Play()
+
+	tween.Completed:Connect(function()
+
+		Main.Visible = false
+	end)
+end
+
+OpenButton.MouseButton1Click:Connect(function()
+
+	if Main.Visible then
+		closePanel()
+	else
+		openPanel()
+	end
+end)
+
+Close.MouseButton1Click:Connect(function()
+	closePanel()
 end)
 
 --==================================================
 -- KEYBOARD
 --==================================================
 
-UserInputService.InputBegan:Connect(function(input, processed)
+UserInputService.InputBegan:Connect(
+	function(input, processed)
 
-	if processed then
-		return
-	end
-
-	if input.KeyCode == Enum.KeyCode.RightBracket then
-
-		Settings.PlayerHitbox += 0.5
-
-		if Settings.PlayerHitbox > 5 then
-			Settings.PlayerHitbox = 1
+		if processed then
+			return
 		end
 
-		PlayerHitboxButton.Text =
-			"PLAYER HITBOX: x" .. Settings.PlayerHitbox
+		-- RightShift = open/close panel
+		if input.KeyCode ==
+			Enum.KeyCode.RightShift then
 
-		updatePlayerHitboxes()
-	end
-
-	if input.KeyCode == Enum.KeyCode.LeftBracket then
-
-		Settings.PlayerHitbox -= 0.5
-
-		if Settings.PlayerHitbox < 1 then
-			Settings.PlayerHitbox = 5
+			if Main.Visible then
+				closePanel()
+			else
+				openPanel()
+			end
 		end
 
-		PlayerHitboxButton.Text =
-			"PLAYER HITBOX: x" .. Settings.PlayerHitbox
+		if input.KeyCode ==
+			Enum.KeyCode.RightBracket then
 
-		updatePlayerHitboxes()
-	end
+			Settings.PlayerHitbox += 0.5
 
-	if input.KeyCode == Enum.KeyCode.H then
+			if Settings.PlayerHitbox > 5 then
+				Settings.PlayerHitbox = 1
+			end
 
-		Settings.ShowPlayerHitboxes =
-			not Settings.ShowPlayerHitboxes
+			PlayerHitboxButton.Text =
+				"PLAYER HITBOX: x"
+					.. Settings.PlayerHitbox
 
-		if Settings.ShowPlayerHitboxes then
-			ShowPlayerButton.Text =
-				"SHOW PLAYER HITBOXES: ON"
-		else
-			ShowPlayerButton.Text =
-				"SHOW PLAYER HITBOXES: OFF"
+			updatePlayerHitboxes()
 		end
 
-		updatePlayerHitboxes()
+		if input.KeyCode ==
+			Enum.KeyCode.LeftBracket then
+
+			Settings.PlayerHitbox -= 0.5
+
+			if Settings.PlayerHitbox < 1 then
+				Settings.PlayerHitbox = 5
+			end
+
+			PlayerHitboxButton.Text =
+				"PLAYER HITBOX: x"
+					.. Settings.PlayerHitbox
+
+			updatePlayerHitboxes()
+		end
+
+		if input.KeyCode ==
+			Enum.KeyCode.H then
+
+			Settings.ShowPlayerHitboxes =
+				not Settings.ShowPlayerHitboxes
+
+			if Settings.ShowPlayerHitboxes then
+
+				ShowPlayerButton.Text =
+					"SHOW PLAYER HITBOXES: ON"
+
+			else
+
+				ShowPlayerButton.Text =
+					"SHOW PLAYER HITBOXES: OFF"
+			end
+
+			updatePlayerHitboxes()
+		end
 	end
-end)
+)
 
 --==================================================
 -- INITIAL
@@ -951,6 +1056,5 @@ end)
 
 task.wait(1)
 
-updateAllESP()
 updatePlayerHitboxes()
-updateNpcHitboxes()
+updateNpcHitboxes() 
