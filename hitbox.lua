@@ -335,16 +335,48 @@ local function getAimPart(character)
 		or character:FindFirstChild("HumanoidRootPart")
 end
 
-local function getEnemyTarget()
+local function isMarkedEnemy(player)
+	if not Settings.ESP then
+		return false
+	end
+
+	if not isEnemy(player) then
+		return false
+	end
+
+	if not player.Character then
+		return false
+	end
+
+	local highlight = player.Character:FindFirstChild("AdminEnemyESP")
+	local root = player.Character:FindFirstChild("HumanoidRootPart")
+
+	if not highlight or not root then
+		return false
+	end
+
+	if Settings.Markers then
+		local marker = root:FindFirstChild("AdminEnemyMarker")
+
+		if not marker then
+			return false
+		end
+	end
+
+	return true
+end
+
+local function getAimTarget()
 	local closest = nil
 	local closestDistance = Settings.AimRange
 
 	for _, player in ipairs(Players:GetPlayers()) do
-		if isEnemy(player) then
+		if isMarkedEnemy(player) then
 			local part = getAimPart(player.Character)
 
 			if part then
-				local screenPosition, visible = Camera:WorldToViewportPoint(part.Position)
+				local screenPosition, visible =
+					Camera:WorldToViewportPoint(part.Position)
 
 				if visible and screenPosition.Z > 0 then
 					local center = Vector2.new(
@@ -353,8 +385,10 @@ local function getEnemyTarget()
 					)
 
 					local distance = (
-						Vector2.new(screenPosition.X, screenPosition.Y)
-						- center
+						Vector2.new(
+							screenPosition.X,
+							screenPosition.Y
+						) - center
 					).Magnitude
 
 					if distance < closestDistance then
