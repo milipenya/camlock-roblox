@@ -38,7 +38,9 @@ ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 ScreenGui.Parent = PlayerGui
 
+--==================================================
 -- OPEN BUTTON
+--==================================================
 
 local OpenButton = Instance.new("TextButton")
 OpenButton.Name = "OpenCombat"
@@ -61,7 +63,9 @@ OpenStroke.Color = Color3.fromRGB(255, 40, 100)
 OpenStroke.Thickness = 1.5
 OpenStroke.Parent = OpenButton
 
+--==================================================
 -- MAIN
+--==================================================
 
 local Main = Instance.new("Frame")
 Main.Name = "Main"
@@ -82,7 +86,9 @@ MainStroke.Thickness = 1.5
 MainStroke.Transparency = 0.2
 MainStroke.Parent = Main
 
+--==================================================
 -- HEADER
+--==================================================
 
 local Header = Instance.new("Frame")
 Header.Size = UDim2.new(1, 0, 0, 55)
@@ -131,7 +137,9 @@ local CloseCorner = Instance.new("UICorner")
 CloseCorner.CornerRadius = UDim.new(0, 9)
 CloseCorner.Parent = Close
 
+--==================================================
 -- CONTENT
+--==================================================
 
 local Content = Instance.new("ScrollingFrame")
 Content.Position = UDim2.fromOffset(10, 65)
@@ -192,6 +200,7 @@ local function createButton(text)
 	Stroke.Parent = Button
 
 	Button.MouseEnter:Connect(function()
+
 		TweenService:Create(
 			Button,
 			TweenInfo.new(0.12),
@@ -199,9 +208,11 @@ local function createButton(text)
 				BackgroundColor3 = Color3.fromRGB(35, 20, 27)
 			}
 		):Play()
+
 	end)
 
 	Button.MouseLeave:Connect(function()
+
 		TweenService:Create(
 			Button,
 			TweenInfo.new(0.12),
@@ -209,6 +220,7 @@ local function createButton(text)
 				BackgroundColor3 = Color3.fromRGB(18, 18, 21)
 			}
 		):Play()
+
 	end)
 
 	return Button
@@ -243,7 +255,7 @@ local function isEnemy(player)
 end
 
 --==================================================
--- SYSTEM ESP DETECTOR
+-- SYSTEM RED ESP DETECTOR
 --==================================================
 
 local function isRedColor(color)
@@ -252,87 +264,85 @@ local function isRedColor(color)
 		return false
 	end
 
-	-- Red must clearly dominate green/blue
 	return color.R > 0.65
 		and color.R > color.G * 1.8
 		and color.R > color.B * 1.8
 end
 
-local function hasSystemRedESP(player)
+local function getSystemRedHighlight(player)
 
 	local character = player.Character
 
 	if not character then
-		return false
+		return nil
 	end
 
-	--==============================================
-	-- LOOK FOR HIGHLIGHT
-	--==============================================
+	-- Ищем существующий Highlight.
+	-- Панель сама его НЕ создаёт.
 
-	for _, object in ipairs(character:GetDescendants()) do
+	for _, object in ipairs(
+		character:GetDescendants()
+	) do
 
 		if object:IsA("Highlight") then
 
-			local fillRed =
+			-- Disabled Highlight не считается ESP
+			if not object.Enabled then
+				continue
+			end
+
+			local redFill =
 				isRedColor(object.FillColor)
 
-			local outlineRed =
+			local redOutline =
 				isRedColor(object.OutlineColor)
 
-			if fillRed or outlineRed then
-				return true
+			if redFill or redOutline then
+				return object
 			end
 		end
 	end
 
-	--==============================================
-	-- LOOK FOR RED BILLBOARD / MARKER
-	--==============================================
-
-	for _, object in ipairs(character:GetDescendants()) do
-
-		if object:IsA("BillboardGui") then
-
-			for _, child in ipairs(object:GetDescendants()) do
-
-				if child:IsA("TextLabel") then
-
-					if isRedColor(child.TextColor3) then
-
-						-- Don't require a specific name.
-						return true
-					end
-				end
-			end
-		end
-	end
-
-	return false
+	return nil
 end
 
 --==================================================
--- AIM TARGET
+-- AIM TARGET VALIDATION
 --==================================================
 
 local function isValidAimTarget(player)
+
+	if not player then
+		return false
+	end
 
 	if not isEnemy(player) then
 		return false
 	end
 
-	-- THE IMPORTANT PART:
+	-- КЛЮЧЕВАЯ ПРОВЕРКА:
 	--
-	-- The aimbot does NOT create its own ESP.
-	-- It only checks whether the existing
-	-- SYSTEM ESP is currently visible on the player.
+	-- Есть активный красный системный Highlight?
+	-- НЕТ -> игрок полностью игнорируется.
+	-- ДА  -> игрок может стать целью.
 
-	if not hasSystemRedESP(player) then
+	local highlight =
+		getSystemRedHighlight(player)
+
+	if not highlight then
+		return false
+	end
+
+	if not highlight.Enabled then
 		return false
 	end
 
 	return true
 end
+
+--==================================================
+-- AIM PART
+--==================================================
 
 local function getAimPart(character)
 
@@ -351,15 +361,29 @@ local function getAimPart(character)
 
 	elseif Settings.AimPart == "HumanoidRootPart" then
 
-		return character:FindFirstChild("HumanoidRootPart")
+		return character:FindFirstChild(
+			"HumanoidRootPart"
+		)
 	end
 
 	return character:FindFirstChild("Head")
 end
 
+--==================================================
+-- CURRENT TARGET
+--==================================================
+
+local CurrentTarget = nil
+
+--==================================================
+-- FIND AIM TARGET
+--==================================================
+
 local function getAimTarget()
 
 	local closest = nil
+	local closestPlayer = nil
+
 	local closestDistance = Settings.AimRange
 
 	local viewport = Camera.ViewportSize
@@ -369,20 +393,44 @@ local function getAimTarget()
 		viewport.Y / 2
 	)
 
-	for _, player in ipairs(Players:GetPlayers()) do
+	--==================================================
+	-- IMPORTANT:
+	-- Validate old target FIRST.
+	--==================================================
 
-		-- Only players with the SYSTEM RED ESP
-		-- are even considered.
+	if CurrentTarget then
+
+		if not isValidAimTarget(CurrentTarget) then
+
+			-- ESP исчез / игрок умер / стал союзником
+			-- Старую цель немедленно забываем.
+
+			CurrentTarget = nil
+		end
+	end
+
+	--==================================================
+	-- SEARCH ONLY PLAYERS WITH RED SYSTEM ESP
+	--==================================================
+
+	for _, player in ipairs(
+		Players:GetPlayers()
+	) do
 
 		if isValidAimTarget(player) then
 
 			local character = player.Character
+
 			local humanoid =
-				character:FindFirstChildOfClass("Humanoid")
+				character:FindFirstChildOfClass(
+					"Humanoid"
+				)
 
-			if humanoid and humanoid.Health > 0 then
+			if humanoid
+				and humanoid.Health > 0 then
 
-				local part = getAimPart(character)
+				local part =
+					getAimPart(character)
 
 				if part then
 
@@ -391,7 +439,8 @@ local function getAimTarget()
 							part.Position
 						)
 
-					if visible and screenPosition.Z > 0 then
+					if visible
+						and screenPosition.Z > 0 then
 
 						local screenPoint =
 							Vector2.new(
@@ -400,18 +449,39 @@ local function getAimTarget()
 							)
 
 						local distance =
-							(screenPoint - center).Magnitude
+							(
+								screenPoint - center
+							).Magnitude
 
 						if distance < closestDistance then
 
-							closestDistance = distance
-							closest = part
+							closestDistance =
+								distance
 
+							closest =
+								part
+
+							closestPlayer =
+								player
 						end
 					end
 				end
 			end
 		end
+	end
+
+	--==================================================
+	-- NO ESP = NO TARGET
+	--==================================================
+
+	if closestPlayer then
+
+		CurrentTarget =
+			closestPlayer
+
+	else
+
+		CurrentTarget = nil
 	end
 
 	return closest
@@ -426,28 +496,48 @@ local AimbotButton =
 
 AimbotButton.MouseButton1Click:Connect(function()
 
-	Settings.Aimbot = not Settings.Aimbot
+	Settings.Aimbot =
+		not Settings.Aimbot
 
 	if Settings.Aimbot then
 
-		AimbotButton.Text = "AIMBOT: ON"
+		AimbotButton.Text =
+			"AIMBOT: ON"
+
 		AimbotButton.TextColor3 =
-			Color3.fromRGB(255, 50, 110)
+			Color3.fromRGB(
+				255,
+				50,
+				110
+			)
 
 	else
 
-		AimbotButton.Text = "AIMBOT: OFF"
+		AimbotButton.Text =
+			"AIMBOT: OFF"
+
 		AimbotButton.TextColor3 =
-			Color3.fromRGB(255, 255, 255)
+			Color3.fromRGB(
+				255,
+				255,
+				255
+			)
+
+		-- При выключении аима
+		-- забываем текущую цель.
+
+		CurrentTarget = nil
 	end
 end)
 
 --==================================================
--- AIM PART
+-- AIM PART BUTTON
 --==================================================
 
 local AimPartButton =
-	createButton("AIM PART: HEAD")
+	createButton(
+		"AIM PART: HEAD"
+	)
 
 AimPartButton.MouseButton1Click:Connect(function()
 
@@ -457,7 +547,8 @@ AimPartButton.MouseButton1Click:Connect(function()
 
 	elseif Settings.AimPart == "Torso" then
 
-		Settings.AimPart = "HumanoidRootPart"
+		Settings.AimPart =
+			"HumanoidRootPart"
 
 	else
 
@@ -466,17 +557,21 @@ AimPartButton.MouseButton1Click:Connect(function()
 
 	AimPartButton.Text =
 		"AIM PART: "
-		.. string.upper(Settings.AimPart)
+			.. string.upper(
+				Settings.AimPart
+			)
 end)
 
 --==================================================
--- SMOOTH
+-- SMOOTH BUTTON
 --==================================================
 
 local SmoothButton =
 	createButton(
 		"AIM SMOOTH: "
-			.. tostring(Settings.AimSmoothness)
+			.. tostring(
+				Settings.AimSmoothness
+			)
 	)
 
 SmoothButton.MouseButton1Click:Connect(function()
@@ -488,15 +583,19 @@ SmoothButton.MouseButton1Click:Connect(function()
 	end
 
 	Settings.AimSmoothness =
-		math.floor(Settings.AimSmoothness * 100) / 100
+		math.floor(
+			Settings.AimSmoothness * 100
+		) / 100
 
 	SmoothButton.Text =
 		"AIM SMOOTH: "
-		.. tostring(Settings.AimSmoothness)
+			.. tostring(
+				Settings.AimSmoothness
+			)
 end)
 
 --==================================================
--- PLAYER HITBOX
+-- PLAYER HITBOXES
 --==================================================
 
 local PlayerHitboxObjects = {}
@@ -519,6 +618,7 @@ local function createHitbox(player)
 	if PlayerHitboxObjects[player] then
 
 		PlayerHitboxObjects[player]:Destroy()
+
 		PlayerHitboxObjects[player] = nil
 	end
 
@@ -527,15 +627,24 @@ local function createHitbox(player)
 	end
 
 	local box =
-		Instance.new("BoxHandleAdornment")
+		Instance.new(
+			"BoxHandleAdornment"
+		)
 
-	box.Name = "AdminPlayerHitbox"
+	box.Name =
+		"AdminPlayerHitbox"
+
 	box.Adornee = root
+
 	box.Size =
 		root.Size * Settings.PlayerHitbox
 
 	box.Color3 =
-		Color3.fromRGB(255, 50, 100)
+		Color3.fromRGB(
+			255,
+			50,
+			100
+		)
 
 	box.Transparency = 0.75
 	box.AlwaysOnTop = true
@@ -543,12 +652,15 @@ local function createHitbox(player)
 
 	box.Parent = root
 
-	PlayerHitboxObjects[player] = box
+	PlayerHitboxObjects[player] =
+		box
 end
 
 local function updatePlayerHitboxes()
 
-	for _, player in ipairs(Players:GetPlayers()) do
+	for _, player in ipairs(
+		Players:GetPlayers()
+	) do
 
 		if player ~= LocalPlayer then
 			createHitbox(player)
@@ -593,7 +705,11 @@ ShowPlayerButton.MouseButton1Click:Connect(function()
 			"SHOW PLAYER HITBOXES: ON"
 
 		ShowPlayerButton.TextColor3 =
-			Color3.fromRGB(255, 50, 110)
+			Color3.fromRGB(
+				255,
+				50,
+				110
+			)
 
 	else
 
@@ -601,14 +717,18 @@ ShowPlayerButton.MouseButton1Click:Connect(function()
 			"SHOW PLAYER HITBOXES: OFF"
 
 		ShowPlayerButton.TextColor3 =
-			Color3.fromRGB(255, 255, 255)
+			Color3.fromRGB(
+				255,
+				255,
+				255
+			)
 	end
 
 	updatePlayerHitboxes()
 end)
 
 --==================================================
--- NPC HITBOX
+-- NPC HITBOXES
 --==================================================
 
 local NpcHitboxObjects = {}
@@ -619,28 +739,38 @@ local function isNPC(model)
 		return false
 	end
 
-	if Players:GetPlayerFromCharacter(model) then
+	if Players:GetPlayerFromCharacter(
+		model
+	) then
 		return false
 	end
 
 	local humanoid =
-		model:FindFirstChildOfClass("Humanoid")
+		model:FindFirstChildOfClass(
+			"Humanoid"
+		)
 
 	local root =
-		model:FindFirstChild("HumanoidRootPart")
+		model:FindFirstChild(
+			"HumanoidRootPart"
+		)
 
-	return humanoid ~= nil and root ~= nil
+	return humanoid ~= nil
+		and root ~= nil
 end
 
 local function updateNpcHitboxes()
 
-	for model, object in pairs(NpcHitboxObjects) do
+	for model, object in pairs(
+		NpcHitboxObjects
+	) do
 
 		if object then
 			object:Destroy()
 		end
 
-		NpcHitboxObjects[model] = nil
+		NpcHitboxObjects[model] =
+			nil
 	end
 
 	if not Settings.ShowNpcHitboxes then
@@ -668,10 +798,12 @@ local function updateNpcHitboxes()
 				box.Name =
 					"AdminNPCHitbox"
 
-				box.Adornee = root
+				box.Adornee =
+					root
 
 				box.Size =
-					root.Size * Settings.NpcHitbox
+					root.Size *
+					Settings.NpcHitbox
 
 				box.Color3 =
 					Color3.fromRGB(
@@ -730,7 +862,11 @@ ShowNpcButton.MouseButton1Click:Connect(function()
 			"SHOW NPC HITBOXES: ON"
 
 		ShowNpcButton.TextColor3 =
-			Color3.fromRGB(255, 50, 110)
+			Color3.fromRGB(
+				255,
+				50,
+				110
+			)
 
 	else
 
@@ -738,18 +874,24 @@ ShowNpcButton.MouseButton1Click:Connect(function()
 			"SHOW NPC HITBOXES: OFF"
 
 		ShowNpcButton.TextColor3 =
-			Color3.fromRGB(255, 255, 255)
+			Color3.fromRGB(
+				255,
+				255,
+				255
+			)
 	end
 
 	updateNpcHitboxes()
 end)
 
 --==================================================
--- RESET
+-- RESET HITBOXES
 --==================================================
 
 local ResetButton =
-	createButton("RESET HITBOXES")
+	createButton(
+		"RESET HITBOXES"
+	)
 
 ResetButton.MouseButton1Click:Connect(function()
 
@@ -778,6 +920,13 @@ local function setupPlayer(player)
 
 	player.CharacterAdded:Connect(function()
 
+		-- Новый персонаж ещё не считается
+		-- текущей целью.
+
+		if CurrentTarget == player then
+			CurrentTarget = nil
+		end
+
 		task.wait(0.5)
 
 		createHitbox(player)
@@ -793,8 +942,16 @@ local function setupPlayer(player)
 	player:GetPropertyChangedSignal(
 		"Team"
 	):Connect(function()
-		-- Nothing else needed.
-		-- System ESP remains the source of truth.
+
+		-- Если игрок стал союзником,
+		-- текущая цель будет сброшена
+		-- следующей проверкой аима.
+
+		if CurrentTarget == player
+			and not isEnemy(player) then
+
+			CurrentTarget = nil
+		end
 	end)
 end
 
@@ -805,17 +962,26 @@ for _, player in ipairs(
 	setupPlayer(player)
 end
 
-Players.PlayerAdded:Connect(setupPlayer)
+Players.PlayerAdded:Connect(
+	setupPlayer
+)
 
-Players.PlayerRemoving:Connect(function(player)
+Players.PlayerRemoving:Connect(
+	function(player)
 
-	if PlayerHitboxObjects[player] then
+		if CurrentTarget == player then
+			CurrentTarget = nil
+		end
 
-		PlayerHitboxObjects[player]:Destroy()
+		if PlayerHitboxObjects[player] then
 
-		PlayerHitboxObjects[player] = nil
+			PlayerHitboxObjects[player]:Destroy()
+
+			PlayerHitboxObjects[player] =
+				nil
+		end
 	end
-end)
+)
 
 --==================================================
 -- AIMBOT
@@ -826,16 +992,56 @@ RunService:BindToRenderStep(
 	Enum.RenderPriority.Camera.Value + 1,
 	function()
 
+		--==================================================
+		-- AIM OFF
+		--==================================================
+
 		if not Settings.Aimbot then
+
+			CurrentTarget = nil
+
 			return
 		end
+
+		--==================================================
+		-- GET TARGET
+		--==================================================
 
 		local target =
 			getAimTarget()
 
+		--==================================================
+		-- NO RED ESP
+		--==================================================
+
 		if not target then
+
+			-- Очень важно:
+			-- если красного ESP нет,
+			-- камера вообще не изменяется.
+
+			CurrentTarget = nil
+
 			return
 		end
+
+		--==================================================
+		-- FINAL SAFETY CHECK
+		--==================================================
+
+		if not CurrentTarget
+			or not isValidAimTarget(
+				CurrentTarget
+			) then
+
+			CurrentTarget = nil
+
+			return
+		end
+
+		--==================================================
+		-- AIM
+		--==================================================
 
 		local targetCFrame =
 			CFrame.lookAt(
@@ -867,8 +1073,12 @@ Header.InputBegan:Connect(function(input)
 		Enum.UserInputType.Touch then
 
 		dragging = true
-		dragStart = input.Position
-		startPosition = Main.Position
+
+		dragStart =
+			input.Position
+
+		startPosition =
+			Main.Position
 	end
 end)
 
@@ -893,23 +1103,28 @@ UserInputService.InputChanged:Connect(function(input)
 		Enum.UserInputType.MouseMovement
 		and input.UserInputType ~=
 		Enum.UserInputType.Touch then
+
 		return
 	end
 
 	local delta =
-		input.Position - dragStart
+		input.Position -
+		dragStart
 
-	Main.Position = UDim2.new(
-		startPosition.X.Scale,
-		startPosition.X.Offset + delta.X,
+	Main.Position =
+		UDim2.new(
+			startPosition.X.Scale,
+			startPosition.X.Offset
+				+ delta.X,
 
-		startPosition.Y.Scale,
-		startPosition.Y.Offset + delta.Y
-	)
+			startPosition.Y.Scale,
+			startPosition.Y.Offset
+				+ delta.Y
+		)
 end)
 
 --==================================================
--- OPEN / CLOSE
+-- OPEN / CLOSE ANIMATION
 --==================================================
 
 local function openPanel()
@@ -917,7 +1132,10 @@ local function openPanel()
 	Main.Visible = true
 
 	Main.Size =
-		UDim2.fromOffset(310, 0)
+		UDim2.fromOffset(
+			310,
+			0
+		)
 
 	TweenService:Create(
 		Main,
@@ -927,10 +1145,11 @@ local function openPanel()
 			Enum.EasingDirection.Out
 		),
 		{
-			Size = UDim2.fromOffset(
-				310,
-				500
-			)
+			Size =
+				UDim2.fromOffset(
+					310,
+					500
+				)
 		}
 	):Play()
 end
@@ -946,19 +1165,21 @@ local function closePanel()
 				Enum.EasingDirection.In
 			),
 			{
-				Size = UDim2.fromOffset(
-					310,
-					0
-				)
+				Size =
+					UDim2.fromOffset(
+						310,
+						0
+					)
 			}
 		)
 
 	tween:Play()
 
-	tween.Completed:Connect(function()
-
-		Main.Visible = false
-	end)
+	tween.Completed:Connect(
+		function()
+			Main.Visible = false
+		end
+	)
 end
 
 OpenButton.MouseButton1Click:Connect(function()
@@ -970,9 +1191,11 @@ OpenButton.MouseButton1Click:Connect(function()
 	end
 end)
 
-Close.MouseButton1Click:Connect(function()
-	closePanel()
-end)
+Close.MouseButton1Click:Connect(
+	function()
+		closePanel()
+	end
+)
 
 --==================================================
 -- KEYBOARD
@@ -985,7 +1208,8 @@ UserInputService.InputBegan:Connect(
 			return
 		end
 
-		-- RightShift = open/close panel
+		-- RightShift = open / close
+
 		if input.KeyCode ==
 			Enum.KeyCode.RightShift then
 
@@ -995,6 +1219,8 @@ UserInputService.InputBegan:Connect(
 				openPanel()
 			end
 		end
+
+		-- ] = increase player hitbox
 
 		if input.KeyCode ==
 			Enum.KeyCode.RightBracket then
@@ -1012,6 +1238,8 @@ UserInputService.InputBegan:Connect(
 			updatePlayerHitboxes()
 		end
 
+		-- [ = decrease player hitbox
+
 		if input.KeyCode ==
 			Enum.KeyCode.LeftBracket then
 
@@ -1027,6 +1255,8 @@ UserInputService.InputBegan:Connect(
 
 			updatePlayerHitboxes()
 		end
+
+		-- H = player hitboxes
 
 		if input.KeyCode ==
 			Enum.KeyCode.H then
