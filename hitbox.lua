@@ -15,14 +15,20 @@ local Camera = workspace.CurrentCamera
 --==================================================
 
 local Settings = {
+	-- Player Aimbot
 	Aimbot = false,
 
+	-- NPC Aimbot
+	NpcAimbot = false,
+
+	-- Hitboxes
 	PlayerHitbox = 2.5,
 	NpcHitbox = 2,
 
 	ShowPlayerHitboxes = false,
 	ShowNpcHitboxes = false,
 
+	-- Aim
 	AimPart = "Head",
 	AimSmoothness = 0.25,
 	AimRange = 500,
@@ -277,16 +283,12 @@ local function getSystemRedHighlight(player)
 		return nil
 	end
 
-	-- Ищем существующий Highlight.
-	-- Панель сама его НЕ создаёт.
-
 	for _, object in ipairs(
 		character:GetDescendants()
 	) do
 
 		if object:IsA("Highlight") then
 
-			-- Disabled Highlight не считается ESP
 			if not object.Enabled then
 				continue
 			end
@@ -307,7 +309,7 @@ local function getSystemRedHighlight(player)
 end
 
 --==================================================
--- AIM TARGET VALIDATION
+-- PLAYER AIM VALIDATION
 --==================================================
 
 local function isValidAimTarget(player)
@@ -319,12 +321,6 @@ local function isValidAimTarget(player)
 	if not isEnemy(player) then
 		return false
 	end
-
-	-- КЛЮЧЕВАЯ ПРОВЕРКА:
-	--
-	-- Есть активный красный системный Highlight?
-	-- НЕТ -> игрок полностью игнорируется.
-	-- ДА  -> игрок может стать целью.
 
 	local highlight =
 		getSystemRedHighlight(player)
@@ -370,47 +366,51 @@ local function getAimPart(character)
 end
 
 --==================================================
--- CURRENT TARGET
+-- LOCAL ROOT
+--==================================================
+
+local function getLocalRoot()
+
+	local character = LocalPlayer.Character
+
+	if not character then
+		return nil
+	end
+
+	return character:FindFirstChild(
+		"HumanoidRootPart"
+	)
+end
+
+--==================================================
+-- CURRENT TARGETS
 --==================================================
 
 local CurrentTarget = nil
+local CurrentNpcTarget = nil
 
 --==================================================
--- FIND AIM TARGET
+-- FIND NEAREST PLAYER WITH SYSTEM ESP
 --==================================================
 
 local function getAimTarget()
 
-	local closest = nil
-	local closestPlayer = nil
+	local localRoot =
+		getLocalRoot()
 
-	local closestDistance = Settings.AimRange
+	if not localRoot then
 
-	local viewport = Camera.ViewportSize
+		CurrentTarget = nil
 
-	local center = Vector2.new(
-		viewport.X / 2,
-		viewport.Y / 2
-	)
-
-	--==================================================
-	-- IMPORTANT:
-	-- Validate old target FIRST.
-	--==================================================
-
-	if CurrentTarget then
-
-		if not isValidAimTarget(CurrentTarget) then
-
-			-- ESP исчез / игрок умер / стал союзником
-			-- Старую цель немедленно забываем.
-
-			CurrentTarget = nil
-		end
+		return nil
 	end
 
+	local closestPlayer = nil
+	local closestPart = nil
+	local closestDistance = Settings.AimRange
+
 	--==================================================
-	-- SEARCH ONLY PLAYERS WITH RED SYSTEM ESP
+	-- SEARCH ONLY ENEMY PLAYERS WITH RED ESP
 	--==================================================
 
 	for _, player in ipairs(
@@ -419,80 +419,175 @@ local function getAimTarget()
 
 		if isValidAimTarget(player) then
 
-			local character = player.Character
+			local character =
+				player.Character
 
 			local humanoid =
 				character:FindFirstChildOfClass(
 					"Humanoid"
 				)
 
+			local root =
+				character:FindFirstChild(
+					"HumanoidRootPart"
+				)
+
 			if humanoid
-				and humanoid.Health > 0 then
+				and humanoid.Health > 0
+				and root then
 
-				local part =
-					getAimPart(character)
+				-- Дистанция именно от твоего персонажа
+				local distance =
+					(
+						root.Position
+						- localRoot.Position
+					).Magnitude
 
-				if part then
+				if distance <= Settings.AimRange
+					and distance < closestDistance then
 
-					local screenPosition, visible =
-						Camera:WorldToViewportPoint(
-							part.Position
-						)
+					local part =
+						getAimPart(character)
 
-					if visible
-						and screenPosition.Z > 0 then
+					if part then
 
-						local screenPoint =
-							Vector2.new(
-								screenPosition.X,
-								screenPosition.Y
-							)
+						closestDistance =
+							distance
 
-						local distance =
-							(
-								screenPoint - center
-							).Magnitude
+						closestPlayer =
+							player
 
-						if distance < closestDistance then
-
-							closestDistance =
-								distance
-
-							closest =
-								part
-
-							closestPlayer =
-								player
-						end
+						closestPart =
+							part
 					end
 				end
 			end
 		end
 	end
 
-	--==================================================
-	-- NO ESP = NO TARGET
-	--==================================================
+	CurrentTarget =
+		closestPlayer
 
-	if closestPlayer then
-
-		CurrentTarget =
-			closestPlayer
-
-	else
-
-		CurrentTarget = nil
-	end
-
-	return closest
+	return closestPart
 end
 
 --==================================================
--- AIMBOT BUTTON
+-- NPC CHECK
+--==================================================
+
+local function isNPC(model)
+
+	if not model:IsA("Model") then
+		return false
+	end
+
+	if Players:GetPlayerFromCharacter(
+		model
+	) then
+		return false
+	end
+
+	local humanoid =
+		model:FindFirstChildOfClass(
+			"Humanoid"
+		)
+
+	local root =
+		model:FindFirstChild(
+			"HumanoidRootPart"
+		)
+
+	if not humanoid or not root then
+		return false
+	end
+
+	if humanoid.Health <= 0 then
+		return false
+	end
+
+	return true
+end
+
+--==================================================
+-- FIND NEAREST NPC
+--==================================================
+
+local function getNpcAimTarget()
+
+	local localRoot =
+		getLocalRoot()
+
+	if not localRoot then
+
+		CurrentNpcTarget = nil
+
+		return nil
+	end
+
+	local closestNpc = nil
+	local closestPart = nil
+	local closestDistance = Settings.AimRange
+
+	for _, object in ipairs(
+		workspace:GetDescendants()
+	) do
+
+		if isNPC(object) then
+
+			local humanoid =
+				object:FindFirstChildOfClass(
+					"Humanoid"
+				)
+
+			local root =
+				object:FindFirstChild(
+					"HumanoidRootPart"
+				)
+
+			if humanoid
+				and humanoid.Health > 0
+				and root then
+
+				local distance =
+					(
+						root.Position
+						- localRoot.Position
+					).Magnitude
+
+				if distance <= Settings.AimRange
+					and distance < closestDistance then
+
+					local part =
+						getAimPart(object)
+
+					if part then
+
+						closestDistance =
+							distance
+
+						closestNpc =
+							object
+
+						closestPart =
+							part
+					end
+				end
+			end
+		end
+	end
+
+	CurrentNpcTarget =
+		closestNpc
+
+	return closestPart
+end
+
+--==================================================
+-- PLAYER AIMBOT BUTTON
 --==================================================
 
 local AimbotButton =
-	createButton("AIMBOT: OFF")
+	createButton("PLAYER AIMBOT: OFF")
 
 AimbotButton.MouseButton1Click:Connect(function()
 
@@ -502,7 +597,7 @@ AimbotButton.MouseButton1Click:Connect(function()
 	if Settings.Aimbot then
 
 		AimbotButton.Text =
-			"AIMBOT: ON"
+			"PLAYER AIMBOT: ON"
 
 		AimbotButton.TextColor3 =
 			Color3.fromRGB(
@@ -514,7 +609,7 @@ AimbotButton.MouseButton1Click:Connect(function()
 	else
 
 		AimbotButton.Text =
-			"AIMBOT: OFF"
+			"PLAYER AIMBOT: OFF"
 
 		AimbotButton.TextColor3 =
 			Color3.fromRGB(
@@ -523,10 +618,47 @@ AimbotButton.MouseButton1Click:Connect(function()
 				255
 			)
 
-		-- При выключении аима
-		-- забываем текущую цель.
-
 		CurrentTarget = nil
+	end
+end)
+
+--==================================================
+-- NPC AIMBOT BUTTON
+--==================================================
+
+local NpcAimbotButton =
+	createButton("NPC AIMBOT: OFF")
+
+NpcAimbotButton.MouseButton1Click:Connect(function()
+
+	Settings.NpcAimbot =
+		not Settings.NpcAimbot
+
+	if Settings.NpcAimbot then
+
+		NpcAimbotButton.Text =
+			"NPC AIMBOT: ON"
+
+		NpcAimbotButton.TextColor3 =
+			Color3.fromRGB(
+				255,
+				50,
+				110
+			)
+
+	else
+
+		NpcAimbotButton.Text =
+			"NPC AIMBOT: OFF"
+
+		NpcAimbotButton.TextColor3 =
+			Color3.fromRGB(
+				255,
+				255,
+				255
+			)
+
+		CurrentNpcTarget = nil
 	end
 end)
 
@@ -733,32 +865,6 @@ end)
 
 local NpcHitboxObjects = {}
 
-local function isNPC(model)
-
-	if not model:IsA("Model") then
-		return false
-	end
-
-	if Players:GetPlayerFromCharacter(
-		model
-	) then
-		return false
-	end
-
-	local humanoid =
-		model:FindFirstChildOfClass(
-			"Humanoid"
-		)
-
-	local root =
-		model:FindFirstChild(
-			"HumanoidRootPart"
-		)
-
-	return humanoid ~= nil
-		and root ~= nil
-end
-
 local function updateNpcHitboxes()
 
 	for model, object in pairs(
@@ -920,9 +1026,6 @@ local function setupPlayer(player)
 
 	player.CharacterAdded:Connect(function()
 
-		-- Новый персонаж ещё не считается
-		-- текущей целью.
-
 		if CurrentTarget == player then
 			CurrentTarget = nil
 		end
@@ -942,10 +1045,6 @@ local function setupPlayer(player)
 	player:GetPropertyChangedSignal(
 		"Team"
 	):Connect(function()
-
-		-- Если игрок стал союзником,
-		-- текущая цель будет сброшена
-		-- следующей проверкой аима.
 
 		if CurrentTarget == player
 			and not isEnemy(player) then
@@ -993,67 +1092,108 @@ RunService:BindToRenderStep(
 	function()
 
 		--==================================================
-		-- AIM OFF
+		-- BOTH AIMBOTS OFF
 		--==================================================
 
-		if not Settings.Aimbot then
+		if not Settings.Aimbot
+			and not Settings.NpcAimbot then
 
 			CurrentTarget = nil
+			CurrentNpcTarget = nil
 
 			return
 		end
 
 		--==================================================
-		-- GET TARGET
+		-- PLAYER AIMBOT
+		--
+		-- Приоритет:
+		-- ближайший к твоему персонажу игрок
+		-- среди игроков с красным ESP.
 		--==================================================
 
-		local target =
-			getAimTarget()
+		if Settings.Aimbot then
 
-		--==================================================
-		-- NO RED ESP
-		--==================================================
+			local playerTarget =
+				getAimTarget()
 
-		if not target then
+			if playerTarget
+				and CurrentTarget
+				and isValidAimTarget(
+					CurrentTarget
+				) then
 
-			-- Очень важно:
-			-- если красного ESP нет,
-			-- камера вообще не изменяется.
+				local targetCFrame =
+					CFrame.lookAt(
+						Camera.CFrame.Position,
+						playerTarget.Position
+					)
+
+				Camera.CFrame =
+					Camera.CFrame:Lerp(
+						targetCFrame,
+						Settings.AimSmoothness
+					)
+
+				return
+			end
 
 			CurrentTarget = nil
+		else
 
-			return
+			CurrentTarget = nil
 		end
 
 		--==================================================
-		-- FINAL SAFETY CHECK
+		-- NPC AIMBOT
+		--
+		-- Если подходящего Player ESP нет,
+		-- используется ближайший NPC.
 		--==================================================
 
-		if not CurrentTarget
-			or not isValidAimTarget(
-				CurrentTarget
-			) then
+		if Settings.NpcAimbot then
 
-			CurrentTarget = nil
+			local npcTarget =
+				getNpcAimTarget()
 
-			return
+			if npcTarget
+				and CurrentNpcTarget then
+
+				local humanoid =
+					CurrentNpcTarget:FindFirstChildOfClass(
+						"Humanoid"
+					)
+
+				local root =
+					CurrentNpcTarget:FindFirstChild(
+						"HumanoidRootPart"
+					)
+
+				if humanoid
+					and humanoid.Health > 0
+					and root then
+
+					local targetCFrame =
+						CFrame.lookAt(
+							Camera.CFrame.Position,
+							npcTarget.Position
+						)
+
+					Camera.CFrame =
+						Camera.CFrame:Lerp(
+							targetCFrame,
+							Settings.AimSmoothness
+						)
+
+					return
+				end
+			end
+
+			CurrentNpcTarget = nil
+		else
+
+			CurrentNpcTarget = nil
 		end
-
-		--==================================================
-		-- AIM
-		--==================================================
-
-		local targetCFrame =
-			CFrame.lookAt(
-				Camera.CFrame.Position,
-				target.Position
-			)
-
-		Camera.CFrame =
-			Camera.CFrame:Lerp(
-				targetCFrame,
-				Settings.AimSmoothness
-			)
 	end
 )
 
@@ -1287,4 +1427,4 @@ UserInputService.InputBegan:Connect(
 task.wait(1)
 
 updatePlayerHitboxes()
-updateNpcHitboxes() 
+updateNpcHitboxes()
