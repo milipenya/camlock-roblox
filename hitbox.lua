@@ -1,645 +1,1486 @@
---// COMBAT ADMIN PANEL
+--// COMBAT ADMIN PANEL V2
 --// LocalScript -> StarterPlayer > StarterPlayerScripts
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
-local Camera = workspace.CurrentCamera
-
-local GodModeEvent =
-	ReplicatedStorage:WaitForChild(
-		"CombatGodModeEvent"
-	)
 
 --==================================================
 -- SETTINGS
 --==================================================
 
 local Settings = {
-
-	-- Player Aimbot
-	Aimbot = false,
-
-	-- NPC Aimbot
+	PlayerAimbot = false,
 	NpcAimbot = false,
 
-	-- God Mode
-	GodMode = false,
-
-	-- Hitboxes
 	PlayerHitbox = 2.5,
 	NpcHitbox = 2,
 
 	ShowPlayerHitboxes = false,
 	ShowNpcHitboxes = false,
 
-	-- Aim
 	AimPart = "Head",
 	AimSmoothness = 0.25,
 	AimRange = 500,
+
+	Animations = true,
+	UIScale = 1,
 }
+
+--==================================================
+-- COLORS
+--==================================================
+
+local COLORS = {
+	Background = Color3.fromRGB(7, 8, 12),
+	Panel = Color3.fromRGB(12, 13, 19),
+	Panel2 = Color3.fromRGB(17, 18, 25),
+
+	White = Color3.fromRGB(245, 245, 250),
+	Gray = Color3.fromRGB(145, 148, 160),
+	DarkGray = Color3.fromRGB(45, 47, 58),
+
+	Pink = Color3.fromRGB(255, 35, 115),
+	Red = Color3.fromRGB(255, 45, 80),
+	PinkDark = Color3.fromRGB(85, 15, 45),
+
+	Green = Color3.fromRGB(70, 230, 145),
+}
+
+--==================================================
+-- HELPERS
+--==================================================
+
+local function tween(object, duration, properties, style, direction)
+	if not Settings.Animations then
+		for property, value in pairs(properties) do
+			object[property] = value
+		end
+		return
+	end
+
+	local info = TweenInfo.new(
+		duration or 0.2,
+		style or Enum.EasingStyle.Quad,
+		direction or Enum.EasingDirection.Out
+	)
+
+	TweenService:Create(object, info, properties):Play()
+end
+
+local function corner(parent, radius)
+	local c = Instance.new("UICorner")
+	c.CornerRadius = UDim.new(0, radius or 10)
+	c.Parent = parent
+	return c
+end
+
+local function stroke(parent, color, thickness, transparency)
+	local s = Instance.new("UIStroke")
+	s.Color = color or COLORS.DarkGray
+	s.Thickness = thickness or 1
+	s.Transparency = transparency or 0
+	s.Parent = parent
+	return s
+end
+
+local function label(parent, text, size, color, font)
+	local l = Instance.new("TextLabel")
+	l.BackgroundTransparency = 1
+	l.Text = text
+	l.TextColor3 = color or COLORS.White
+	l.TextSize = size or 14
+	l.Font = font or Enum.Font.GothamMedium
+	l.Parent = parent
+	return l
+end
 
 --==================================================
 -- GUI
 --==================================================
 
-local ScreenGui =
-	Instance.new("ScreenGui")
-
-ScreenGui.Name =
-	"CombatAdminPanel"
-
-ScreenGui.ResetOnSpawn =
-	false
-
-ScreenGui.ZIndexBehavior =
-	Enum.ZIndexBehavior.Sibling
-
-ScreenGui.Parent =
-	PlayerGui
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "CombatAdminPanelV2"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.IgnoreGuiInset = true
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.Parent = PlayerGui
 
 --==================================================
 -- OPEN BUTTON
 --==================================================
 
-local OpenButton =
-	Instance.new("TextButton")
+local OpenButton = Instance.new("TextButton")
+OpenButton.Name = "OpenCombat"
+OpenButton.Size = UDim2.fromOffset(52, 52)
+OpenButton.Position = UDim2.new(0, 18, 0.5, -26)
+OpenButton.BackgroundColor3 = COLORS.Panel
+OpenButton.Text = "⚔"
+OpenButton.TextColor3 = COLORS.Pink
+OpenButton.TextSize = 25
+OpenButton.Font = Enum.Font.GothamBold
+OpenButton.AutoButtonColor = false
+OpenButton.Parent = ScreenGui
 
-OpenButton.Name =
-	"OpenCombat"
+corner(OpenButton, 14)
+stroke(OpenButton, COLORS.Pink, 1.5, 0.15)
 
-OpenButton.Size =
-	UDim2.fromOffset(48, 48)
+OpenButton.MouseEnter:Connect(function()
+	tween(OpenButton, 0.12, {
+		BackgroundColor3 = COLORS.PinkDark
+	})
+end)
 
-OpenButton.Position =
-	UDim2.new(
-		0,
-		20,
-		0.5,
-		-24
-	)
-
-OpenButton.BackgroundColor3 =
-	Color3.fromRGB(
-		10,
-		10,
-		12
-	)
-
-OpenButton.Text =
-	"⚔"
-
-OpenButton.TextColor3 =
-	Color3.fromRGB(
-		255,
-		50,
-		110
-	)
-
-OpenButton.TextSize =
-	24
-
-OpenButton.Font =
-	Enum.Font.GothamBold
-
-OpenButton.AutoButtonColor =
-	false
-
-OpenButton.Parent =
-	ScreenGui
-
-local OpenCorner =
-	Instance.new("UICorner")
-
-OpenCorner.CornerRadius =
-	UDim.new(0, 12)
-
-OpenCorner.Parent =
-	OpenButton
-
-local OpenStroke =
-	Instance.new("UIStroke")
-
-OpenStroke.Color =
-	Color3.fromRGB(
-		255,
-		40,
-		100
-	)
-
-OpenStroke.Thickness =
-	1.5
-
-OpenStroke.Parent =
-	OpenButton
+OpenButton.MouseLeave:Connect(function()
+	tween(OpenButton, 0.12, {
+		BackgroundColor3 = COLORS.Panel
+	})
+end)
 
 --==================================================
--- MAIN
+-- MAIN WINDOW
 --==================================================
 
-local Main =
-	Instance.new("Frame")
+local Main = Instance.new("Frame")
+Main.Name = "Main"
+Main.Size = UDim2.fromOffset(950, 570)
+Main.Position = UDim2.new(0.5, -475, 0.5, -285)
+Main.BackgroundColor3 = COLORS.Background
+Main.BorderSizePixel = 0
+Main.Visible = false
+Main.ClipsDescendants = true
+Main.Parent = ScreenGui
 
-Main.Name =
-	"Main"
-
-Main.Size =
-	UDim2.fromOffset(
-		310,
-		500
-	)
-
-Main.Position =
-	UDim2.new(
-		0,
-		80,
-		0.5,
-		-250
-	)
-
-Main.BackgroundColor3 =
-	Color3.fromRGB(
-		8,
-		8,
-		10
-	)
-
-Main.BorderSizePixel =
-	0
-
-Main.Visible =
-	true
-
-Main.Parent =
-	ScreenGui
-
-local MainCorner =
-	Instance.new("UICorner")
-
-MainCorner.CornerRadius =
-	UDim.new(0, 14)
-
-MainCorner.Parent =
-	Main
-
-local MainStroke =
-	Instance.new("UIStroke")
-
-MainStroke.Color =
-	Color3.fromRGB(
-		255,
-		40,
-		100
-	)
-
-MainStroke.Thickness =
-	1.5
-
-MainStroke.Transparency =
-	0.2
-
-MainStroke.Parent =
-	Main
+corner(Main, 18)
+stroke(Main, COLORS.Pink, 1.5, 0.15)
 
 --==================================================
 -- HEADER
 --==================================================
 
-local Header =
-	Instance.new("Frame")
+local Header = Instance.new("Frame")
+Header.Size = UDim2.new(1, 0, 0, 78)
+Header.BackgroundColor3 = COLORS.Panel
+Header.BorderSizePixel = 0
+Header.Parent = Main
 
-Header.Size =
-	UDim2.new(
-		1,
-		0,
-		0,
-		55
-	)
+corner(Header, 18)
 
-Header.BackgroundColor3 =
-	Color3.fromRGB(
-		15,
-		15,
-		18
-	)
+local HeaderLine = Instance.new("Frame")
+HeaderLine.Size = UDim2.new(1, -40, 0, 1)
+HeaderLine.Position = UDim2.new(0, 20, 1, -1)
+HeaderLine.BackgroundColor3 = COLORS.Pink
+HeaderLine.BackgroundTransparency = 0.45
+HeaderLine.BorderSizePixel = 0
+HeaderLine.Parent = Header
 
-Header.BorderSizePixel =
-	0
-
-Header.Parent =
-	Main
-
-local HeaderCorner =
-	Instance.new("UICorner")
-
-HeaderCorner.CornerRadius =
-	UDim.new(0, 14)
-
-HeaderCorner.Parent =
-	Header
-
-local Title =
-	Instance.new("TextLabel")
-
-Title.BackgroundTransparency =
-	1
-
-Title.Position =
-	UDim2.fromOffset(
-		18,
-		7
-	)
-
-Title.Size =
-	UDim2.new(
-		1,
-		-70,
-		0,
-		25
-	)
-
-Title.Text =
-	"COMBAT"
-
-Title.TextColor3 =
-	Color3.fromRGB(
-		255,
-		255,
-		255
-	)
-
-Title.TextSize =
-	20
-
-Title.Font =
+local Logo = label(
+	Header,
+	"⚔",
+	34,
+	COLORS.Pink,
 	Enum.Font.GothamBold
+)
 
-Title.TextXAlignment =
-	Enum.TextXAlignment.Left
+Logo.Position = UDim2.fromOffset(22, 18)
+Logo.Size = UDim2.fromOffset(42, 42)
+Logo.TextXAlignment = Enum.TextXAlignment.Center
 
-Title.Parent =
-	Header
-
-local Subtitle =
-	Instance.new("TextLabel")
-
-Subtitle.BackgroundTransparency =
-	1
-
-Subtitle.Position =
-	UDim2.fromOffset(
-		19,
-		30
-	)
-
-Subtitle.Size =
-	UDim2.new(
-		1,
-		-70,
-		0,
-		18
-	)
-
-Subtitle.Text =
-	"ADMIN DEBUG PANEL"
-
-Subtitle.TextColor3 =
-	Color3.fromRGB(
-		255,
-		50,
-		110
-	)
-
-Subtitle.TextSize =
-	10
-
-Subtitle.Font =
+local Title = label(
+	Header,
+	"COMBAT",
+	22,
+	COLORS.White,
 	Enum.Font.GothamBold
+)
 
-Subtitle.TextXAlignment =
-	Enum.TextXAlignment.Left
+Title.Position = UDim2.fromOffset(72, 14)
+Title.Size = UDim2.fromOffset(250, 28)
+Title.TextXAlignment = Enum.TextXAlignment.Left
 
-Subtitle.Parent =
-	Header
-
-local Close =
-	Instance.new("TextButton")
-
-Close.Size =
-	UDim2.fromOffset(
-		35,
-		35
-	)
-
-Close.Position =
-	UDim2.new(
-		1,
-		-45,
-		0,
-		10
-	)
-
-Close.BackgroundColor3 =
-	Color3.fromRGB(
-		30,
-		30,
-		34
-	)
-
-Close.Text =
-	"×"
-
-Close.TextColor3 =
-	Color3.fromRGB(
-		255,
-		70,
-		110
-	)
-
-Close.TextSize =
-	24
-
-Close.Font =
+local Subtitle = label(
+	Header,
+	"ADMIN DEBUG PANEL",
+	10,
+	COLORS.Pink,
 	Enum.Font.GothamBold
+)
 
-Close.AutoButtonColor =
-	false
+Subtitle.Position = UDim2.fromOffset(73, 42)
+Subtitle.Size = UDim2.fromOffset(250, 18)
+Subtitle.TextXAlignment = Enum.TextXAlignment.Left
 
-Close.Parent =
-	Header
+local AdminBadge = Instance.new("Frame")
+AdminBadge.Size = UDim2.fromOffset(150, 42)
+AdminBadge.Position = UDim2.new(1, -205, 0, 18)
+AdminBadge.BackgroundColor3 = COLORS.Panel2
+AdminBadge.Parent = Header
 
-local CloseCorner =
-	Instance.new("UICorner")
+corner(AdminBadge, 11)
+stroke(AdminBadge, COLORS.DarkGray, 1)
 
-CloseCorner.CornerRadius =
-	UDim.new(0, 9)
+local AdminText = label(
+	AdminBadge,
+	"♛  ADMIN",
+	13,
+	COLORS.White,
+	Enum.Font.GothamBold
+)
 
-CloseCorner.Parent =
-	Close
+AdminText.Size = UDim2.fromScale(1, 1)
+AdminText.TextXAlignment = Enum.TextXAlignment.Center
 
---==================================================
--- CONTENT
---==================================================
+local Close = Instance.new("TextButton")
+Close.Size = UDim2.fromOffset(42, 42)
+Close.Position = UDim2.new(1, -55, 0, 18)
+Close.BackgroundColor3 = COLORS.Panel2
+Close.Text = "×"
+Close.TextColor3 = COLORS.Pink
+Close.TextSize = 27
+Close.Font = Enum.Font.GothamBold
+Close.AutoButtonColor = false
+Close.Parent = Header
 
-local Content =
-	Instance.new("ScrollingFrame")
-
-Content.Position =
-	UDim2.fromOffset(
-		10,
-		65
-	)
-
-Content.Size =
-	UDim2.new(
-		1,
-		-20,
-		1,
-		-75
-	)
-
-Content.BackgroundTransparency =
-	1
-
-Content.BorderSizePixel =
-	0
-
-Content.ScrollBarThickness =
-	3
-
-Content.ScrollBarImageColor3 =
-	Color3.fromRGB(
-		255,
-		40,
-		100
-	)
-
-Content.CanvasSize =
-	UDim2.new(
-		0,
-		0,
-		0,
-		0
-	)
-
-Content.Parent =
-	Main
-
-local Layout =
-	Instance.new("UIListLayout")
-
-Layout.Padding =
-	UDim.new(
-		0,
-		7
-	)
-
-Layout.SortOrder =
-	Enum.SortOrder.LayoutOrder
-
-Layout.Parent =
-	Content
-
-local Padding =
-	Instance.new("UIPadding")
-
-Padding.PaddingLeft =
-	UDim.new(
-		0,
-		3
-	)
-
-Padding.PaddingRight =
-	UDim.new(
-		0,
-		3
-	)
-
-Padding.PaddingBottom =
-	UDim.new(
-		0,
-		10
-	)
-
-Padding.Parent =
-	Content
-
-Layout:GetPropertyChangedSignal(
-		"AbsoluteContentSize"
-):Connect(function()
-
-	Content.CanvasSize =
-		UDim2.new(
-			0,
-			0,
-			0,
-			Layout.AbsoluteContentSize.Y
-				+ 15
-		)
-end)
+corner(Close, 11)
+stroke(Close, COLORS.Pink, 1, 0.25)
 
 --==================================================
--- BUTTON CREATOR
+-- BODY
 --==================================================
 
-local function createButton(text)
+local Body = Instance.new("Frame")
+Body.Position = UDim2.fromOffset(12, 90)
+Body.Size = UDim2.new(1, -24, 1, -102)
+Body.BackgroundTransparency = 1
+Body.Parent = Main
 
-	local Button =
-		Instance.new("TextButton")
+--==================================================
+-- SIDEBAR
+--==================================================
 
-	Button.Size =
-		UDim2.new(
-			1,
-			-6,
-			0,
-			42
-		)
+local Sidebar = Instance.new("Frame")
+Sidebar.Size = UDim2.fromOffset(190, 1)
+Sidebar.Size = UDim2.new(0, 190, 1, 0)
+Sidebar.BackgroundColor3 = COLORS.Panel
+Sidebar.BorderSizePixel = 0
+Sidebar.Parent = Body
 
-	Button.BackgroundColor3 =
-		Color3.fromRGB(
-			18,
-			18,
-			21
-		)
+corner(Sidebar, 14)
+stroke(Sidebar, COLORS.DarkGray, 1)
 
-	Button.BorderSizePixel =
-		0
+local SidebarLayout = Instance.new("UIListLayout")
+SidebarLayout.Padding = UDim.new(0, 9)
+SidebarLayout.SortOrder = Enum.SortOrder.LayoutOrder
+SidebarLayout.Parent = Sidebar
 
-	Button.Text =
-		text
+local SidebarPadding = Instance.new("UIPadding")
+SidebarPadding.PaddingTop = UDim.new(0, 15)
+SidebarPadding.PaddingLeft = UDim.new(0, 12)
+SidebarPadding.PaddingRight = UDim.new(0, 12)
+SidebarPadding.Parent = Sidebar
 
-	Button.TextColor3 =
-		Color3.fromRGB(
-			255,
-			255,
-			255
-		)
+--==================================================
+-- PAGE AREA
+--==================================================
 
-	Button.TextSize =
-		13
+local PageArea = Instance.new("Frame")
+PageArea.Position = UDim2.fromOffset(202, 0)
+PageArea.Size = UDim2.new(1, -202, 1, 0)
+PageArea.BackgroundTransparency = 1
+PageArea.ClipsDescendants = true
+PageArea.Parent = Body
 
-	Button.Font =
+--==================================================
+-- SIDEBAR BUTTON
+--==================================================
+
+local Pages = {}
+local CurrentPage = nil
+
+local function createNavButton(icon, text)
+	local Button = Instance.new("TextButton")
+	Button.Size = UDim2.new(1, 0, 0, 58)
+	Button.BackgroundColor3 = COLORS.Panel2
+	Button.Text = ""
+	Button.AutoButtonColor = false
+	Button.Parent = Sidebar
+
+	corner(Button, 11)
+	local ButtonStroke = stroke(Button, COLORS.DarkGray, 1)
+
+	local Icon = label(
+		Button,
+		icon,
+		21,
+		COLORS.Gray,
 		Enum.Font.GothamBold
+	)
 
-	Button.AutoButtonColor =
-		false
+	Icon.Position = UDim2.fromOffset(14, 0)
+	Icon.Size = UDim2.fromOffset(30, 58)
+	Icon.TextXAlignment = Enum.TextXAlignment.Center
 
-	Button.Parent =
-		Content
+	local Text = label(
+		Button,
+		text,
+		13,
+		COLORS.White,
+		Enum.Font.GothamBold
+	)
 
-	local Corner =
-		Instance.new("UICorner")
+	Text.Position = UDim2.fromOffset(52, 0)
+	Text.Size = UDim2.new(1, -82, 1, 0)
+	Text.TextXAlignment = Enum.TextXAlignment.Left
 
-	Corner.CornerRadius =
-		UDim.new(
+	local Arrow = label(
+		Button,
+		"›",
+		22,
+		COLORS.Gray,
+		Enum.Font.GothamBold
+	)
+
+	Arrow.Position = UDim2.new(1, -35, 0, 0)
+	Arrow.Size = UDim2.fromOffset(25, 58)
+	Arrow.TextXAlignment = Enum.TextXAlignment.Center
+
+	Button.MouseEnter:Connect(function()
+		if CurrentPage ~= text then
+			tween(Button, 0.12, {
+				BackgroundColor3 = Color3.fromRGB(28, 20, 28)
+			})
+			tween(Arrow, 0.12, {
+				TextColor3 = COLORS.Pink
+			})
+		end
+	end)
+
+	Button.MouseLeave:Connect(function()
+		if CurrentPage ~= text then
+			tween(Button, 0.12, {
+				BackgroundColor3 = COLORS.Panel2
+			})
+			tween(Arrow, 0.12, {
+				TextColor3 = COLORS.Gray
+			})
+		end
+	end)
+
+	return Button, Icon, Text, Arrow, ButtonStroke
+end
+
+--==================================================
+-- PAGE CREATOR
+--==================================================
+
+local function createPage(name, titleText, subtitleText)
+	local Page = Instance.new("Frame")
+	Page.Name = name
+	Page.Size = UDim2.fromScale(1, 1)
+	Page.Position = UDim2.fromScale(1, 0)
+	Page.BackgroundColor3 = COLORS.Panel
+	Page.BorderSizePixel = 0
+	Page.Visible = false
+	Page.Parent = PageArea
+
+	corner(Page, 14)
+	stroke(Page, COLORS.DarkGray, 1)
+
+	local Top = Instance.new("Frame")
+	Top.Size = UDim2.new(1, 0, 0, 68)
+	Top.BackgroundTransparency = 1
+	Top.Parent = Page
+
+	local PageTitle = label(
+		Top,
+		titleText,
+		21,
+		COLORS.White,
+		Enum.Font.GothamBold
+	)
+
+	PageTitle.Position = UDim2.fromOffset(20, 12)
+	PageTitle.Size = UDim2.new(1, -40, 0, 27)
+	PageTitle.TextXAlignment = Enum.TextXAlignment.Left
+
+	local PageSubtitle = label(
+		Top,
+		subtitleText,
+		11,
+		COLORS.Gray,
+		Enum.Font.GothamMedium
+	)
+
+	PageSubtitle.Position = UDim2.fromOffset(21, 39)
+	PageSubtitle.Size = UDim2.new(1, -40, 0, 18)
+	PageSubtitle.TextXAlignment = Enum.TextXAlignment.Left
+
+	local Content = Instance.new("ScrollingFrame")
+	Content.Position = UDim2.fromOffset(15, 75)
+	Content.Size = UDim2.new(1, -30, 1, -90)
+	Content.BackgroundTransparency = 1
+	Content.BorderSizePixel = 0
+	Content.ScrollBarThickness = 3
+	Content.ScrollBarImageColor3 = COLORS.Pink
+	Content.CanvasSize = UDim2.new(0, 0, 0, 0)
+	Content.Parent = Page
+
+	local Layout = Instance.new("UIListLayout")
+	Layout.Padding = UDim.new(0, 9)
+	Layout.SortOrder = Enum.SortOrder.LayoutOrder
+	Layout.Parent = Content
+
+	local Pad = Instance.new("UIPadding")
+	Pad.PaddingBottom = UDim.new(0, 15)
+	Pad.Parent = Content
+
+	Layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+		Content.CanvasSize = UDim2.fromOffset(
 			0,
-			9
+			Layout.AbsoluteContentSize.Y + 20
 		)
+	end)
 
-	Corner.Parent =
-	Button
+	Pages[name] = {
+		Frame = Page,
+		Content = Content,
+	}
 
-	local Stroke =
-		Instance.new("UIStroke")
+	return Page, Content
+end
 
-	Stroke.Color =
-		Color3.fromRGB(
-			45,
-			45,
-			50
-		)
+--==================================================
+-- BACK BUTTON
+--==================================================
 
-	Stroke.Thickness =
-		1
+local function createBackButton(parent)
+	local Button = Instance.new("TextButton")
+	Button.Size = UDim2.fromOffset(110, 38)
+	Button.Position = UDim2.new(1, -130, 0, 14)
+	Button.BackgroundColor3 = COLORS.Panel2
+	Button.Text = "←  BACK"
+	Button.TextColor3 = COLORS.White
+	Button.TextSize = 12
+	Button.Font = Enum.Font.GothamBold
+	Button.AutoButtonColor = false
+	Button.Parent = parent
 
-	Stroke.Parent =
-	Button
+	corner(Button, 9)
+	stroke(Button, COLORS.DarkGray, 1)
 
-	Button.MouseEnter:Connect(
-		function()
-
-			TweenService:Create(
-				Button,
-				TweenInfo.new(0.12),
-				{
-					BackgroundColor3 =
-						Color3.fromRGB(
-							35,
-							20,
-							27
-						)
-				}
-			):Play()
-		end
-	)
-
-	Button.MouseLeave:Connect(
-		function()
-
-			TweenService:Create(
-				Button,
-				TweenInfo.new(0.12),
-				{
-					BackgroundColor3 =
-						Color3.fromRGB(
-							18,
-							18,
-							21
-						)
-				}
-			):Play()
-		end
-	)
+	Button.MouseButton1Click:Connect(function()
+		showPage("HOME")
+	end)
 
 	return Button
 end
 
 --==================================================
--- ENEMY CHECK
+-- HOME
+--==================================================
+
+local Home, HomeContent = createPage(
+	"HOME",
+	"COMBAT",
+	"Administrative combat controls and diagnostics"
+)
+
+--==================================================
+-- HOME CARDS
+--==================================================
+
+local function createSectionCard(parent, icon, titleText, descText)
+	local Button = Instance.new("TextButton")
+	Button.Size = UDim2.new(1, -4, 0, 78)
+	Button.BackgroundColor3 = COLORS.Panel2
+	Button.Text = ""
+	Button.AutoButtonColor = false
+	Button.Parent = parent
+
+	corner(Button, 12)
+	local s = stroke(Button, COLORS.DarkGray, 1)
+
+	local Icon = label(
+		Button,
+		icon,
+		25,
+		COLORS.Pink,
+		Enum.Font.GothamBold
+	)
+
+	Icon.Position = UDim2.fromOffset(17, 0)
+	Icon.Size = UDim2.fromOffset(45, 78)
+	Icon.TextXAlignment = Enum.TextXAlignment.Center
+
+	local Title = label(
+		Button,
+		titleText,
+		14,
+		COLORS.White,
+		Enum.Font.GothamBold
+	)
+
+	Title.Position = UDim2.fromOffset(70, 14)
+	Title.Size = UDim2.new(1, -120, 0, 23)
+	Title.TextXAlignment = Enum.TextXAlignment.Left
+
+	local Desc = label(
+		Button,
+		descText,
+		10,
+		COLORS.Gray,
+		Enum.Font.GothamMedium
+	)
+
+	Desc.Position = UDim2.fromOffset(70, 38)
+	Desc.Size = UDim2.new(1, -120, 0, 25)
+	Desc.TextXAlignment = Enum.TextXAlignment.Left
+	Desc.TextWrapped = true
+
+	local Arrow = label(
+		Button,
+		"›",
+		25,
+		COLORS.Gray,
+		Enum.Font.GothamBold
+	)
+
+	Arrow.Position = UDim2.new(1, -45, 0, 0)
+	Arrow.Size = UDim2.fromOffset(30, 78)
+
+	Button.MouseEnter:Connect(function()
+		tween(Button, 0.14, {
+			BackgroundColor3 = Color3.fromRGB(28, 18, 27)
+		})
+		tween(s, 0.14, {
+			Color = COLORS.Pink,
+			Transparency = 0.35
+		})
+		tween(Arrow, 0.14, {
+			TextColor3 = COLORS.Pink
+		})
+	end)
+
+	Button.MouseLeave:Connect(function()
+		tween(Button, 0.14, {
+			BackgroundColor3 = COLORS.Panel2
+		})
+		tween(s, 0.14, {
+			Color = COLORS.DarkGray,
+			Transparency = 0
+		})
+		tween(Arrow, 0.14, {
+			TextColor3 = COLORS.Gray
+		})
+	end)
+
+	Button.MouseButton1Click:Connect(function()
+		showPage(titleText)
+	end)
+
+	return Button
+end
+
+createSectionCard(
+	HomeContent,
+	"◎",
+	"AIM",
+	"Aimbot, target selection, aim part, range and smoothness"
+)
+
+createSectionCard(
+	HomeContent,
+	"◇",
+	"HITBOXES",
+	"Player and NPC hitbox debugging and visualization"
+)
+
+createSectionCard(
+	HomeContent,
+	"⚙",
+	"DEBUG",
+	"Performance, target and NPC scanner diagnostics"
+)
+
+createSectionCard(
+	HomeContent,
+	"✦",
+	"MISC",
+	"Interface, animations and general settings"
+)
+
+--==================================================
+-- AIM PAGE
+--==================================================
+
+local AimPage, AimContent = createPage(
+	"AIM",
+	"AIM",
+	"Targeting and camera assistance controls"
+)
+
+createBackButton(AimPage)
+
+local function createToggle(parent, titleText, descText, initial, callback)
+	local Frame = Instance.new("Frame")
+	Frame.Size = UDim2.new(1, -4, 0, 64)
+	Frame.BackgroundColor3 = COLORS.Panel2
+	Frame.Parent = parent
+
+	corner(Frame, 10)
+	stroke(Frame, COLORS.DarkGray, 1)
+
+	local Title = label(
+		Frame,
+		titleText,
+		13,
+		COLORS.White,
+		Enum.Font.GothamBold
+	)
+
+	Title.Position = UDim2.fromOffset(16, 10)
+	Title.Size = UDim2.new(1, -100, 0, 20)
+	Title.TextXAlignment = Enum.TextXAlignment.Left
+
+	local Desc = label(
+		Frame,
+		descText,
+		9,
+		COLORS.Gray,
+		Enum.Font.GothamMedium
+	)
+
+	Desc.Position = UDim2.fromOffset(16, 32)
+	Desc.Size = UDim2.new(1, -100, 0, 18)
+	Desc.TextXAlignment = Enum.TextXAlignment.Left
+
+	local Toggle = Instance.new("TextButton")
+	Toggle.Size = UDim2.fromOffset(58, 30)
+	Toggle.Position = UDim2.new(1, -74, 0.5, -15)
+	Toggle.BackgroundColor3 = COLORS.DarkGray
+	Toggle.Text = ""
+	Toggle.AutoButtonColor = false
+	Toggle.Parent = Frame
+
+	corner(Toggle, 15)
+
+	local Knob = Instance.new("Frame")
+	Knob.Size = UDim2.fromOffset(24, 24)
+	Knob.Position = UDim2.fromOffset(3, 3)
+	Knob.BackgroundColor3 = COLORS.White
+	Knob.Parent = Toggle
+
+	corner(Knob, 12)
+
+	local enabled = initial
+
+	local function refresh()
+		if enabled then
+			tween(Toggle, 0.15, {
+				BackgroundColor3 = COLORS.Pink
+			})
+			tween(Knob, 0.15, {
+				Position = UDim2.new(1, -27, 0, 3)
+			})
+		else
+			tween(Toggle, 0.15, {
+				BackgroundColor3 = COLORS.DarkGray
+			})
+			tween(Knob, 0.15, {
+				Position = UDim2.fromOffset(3, 3)
+			})
+		end
+	end
+
+	Toggle.MouseButton1Click:Connect(function()
+		enabled = not enabled
+		refresh()
+		callback(enabled)
+	end)
+
+	refresh()
+
+	return Frame
+end
+
+createToggle(
+	AimContent,
+	"PLAYER AIMBOT",
+	"Targets only enemy players with active red Highlight ESP",
+	false,
+	function(value)
+		Settings.PlayerAimbot = value
+		if not value then
+			CurrentTarget = nil
+		end
+	end
+)
+
+createToggle(
+	AimContent,
+	"NPC AIMBOT",
+	"Targets the nearest valid NPC using the cached NPC list",
+	false,
+	function(value)
+		Settings.NpcAimbot = value
+		if not value then
+			CurrentNpcTarget = nil
+		end
+	end
+)
+
+--==================================================
+-- SELECTOR
+--==================================================
+
+local function createSelector(parent, titleText, values, currentValue, callback)
+	local Frame = Instance.new("Frame")
+	Frame.Size = UDim2.new(1, -4, 0, 58)
+	Frame.BackgroundColor3 = COLORS.Panel2
+	Frame.Parent = parent
+
+	corner(Frame, 10)
+	stroke(Frame, COLORS.DarkGray, 1)
+
+	local Title = label(
+		Frame,
+		titleText,
+		12,
+		COLORS.White,
+		Enum.Font.GothamBold
+	)
+
+	Title.Position = UDim2.fromOffset(16, 0)
+	Title.Size = UDim2.new(0.5, 0, 1, 0)
+	Title.TextXAlignment = Enum.TextXAlignment.Left
+
+	local Button = Instance.new("TextButton")
+	Button.Size = UDim2.fromOffset(170, 38)
+	Button.Position = UDim2.new(1, -185, 0.5, -19)
+	Button.BackgroundColor3 = COLORS.Panel
+	Button.TextColor3 = COLORS.White
+	Button.TextSize = 11
+	Button.Font = Enum.Font.GothamBold
+	Button.AutoButtonColor = false
+	Button.Text = string.upper(currentValue)
+	Button.Parent = Frame
+
+	corner(Button, 9)
+	stroke(Button, COLORS.DarkGray, 1)
+
+	local index = table.find(values, currentValue) or 1
+
+	Button.MouseButton1Click:Connect(function()
+		index += 1
+
+		if index > #values then
+			index = 1
+		end
+
+		local value = values[index]
+		Button.Text = string.upper(value)
+
+		callback(value)
+
+		tween(Button, 0.08, {
+			Size = UDim2.fromOffset(162, 36)
+		})
+
+		task.delay(0.08, function()
+			tween(Button, 0.08, {
+				Size = UDim2.fromOffset(170, 38)
+			})
+		end)
+	end)
+
+	return Frame
+end
+
+createSelector(
+	AimContent,
+	"AIM PART",
+	{"Head", "Torso", "HumanoidRootPart"},
+	Settings.AimPart,
+	function(value)
+		Settings.AimPart = value
+	end
+)
+
+--==================================================
+-- SLIDER
+--==================================================
+
+local function createSlider(parent, titleText, min, max, current, callback)
+	local Frame = Instance.new("Frame")
+	Frame.Size = UDim2.new(1, -4, 0, 70)
+	Frame.BackgroundColor3 = COLORS.Panel2
+	Frame.Parent = parent
+
+	corner(Frame, 10)
+	stroke(Frame, COLORS.DarkGray, 1)
+
+	local Title = label(
+		Frame,
+		titleText,
+		12,
+		COLORS.White,
+		Enum.Font.GothamBold
+	)
+
+	Title.Position = UDim2.fromOffset(16, 9)
+	Title.Size = UDim2.fromOffset(180, 20)
+	Title.TextXAlignment = Enum.TextXAlignment.Left
+
+	local ValueLabel = label(
+		Frame,
+		string.format("%.2f", current),
+		12,
+		COLORS.Pink,
+		Enum.Font.GothamBold
+	)
+
+	ValueLabel.Position = UDim2.new(1, -70, 0, 9)
+	ValueLabel.Size = UDim2.fromOffset(55, 20)
+	ValueLabel.TextXAlignment = Enum.TextXAlignment.Right
+
+	local Bar = Instance.new("Frame")
+	Bar.Size = UDim2.new(1, -32, 0, 6)
+	Bar.Position = UDim2.fromOffset(16, 44)
+	Bar.BackgroundColor3 = COLORS.DarkGray
+	Bar.Parent = Frame
+
+	corner(Bar, 3)
+
+	local Fill = Instance.new("Frame")
+	Fill.Size = UDim2.new(
+		(current - min) / (max - min),
+		0,
+		1,
+		0
+	)
+	Fill.BackgroundColor3 = COLORS.Pink
+	Fill.Parent = Bar
+
+	corner(Fill, 3)
+
+	local draggingSlider = false
+
+	local function setValue(inputX)
+		local relative = math.clamp(
+			(inputX - Bar.AbsolutePosition.X) /
+			Bar.AbsoluteSize.X,
+			0,
+			1
+		)
+
+		local value = min + (max - min) * relative
+
+		value = math.floor(value * 100) / 100
+
+		Fill.Size = UDim2.new(relative, 0, 1, 0)
+		ValueLabel.Text = string.format("%.2f", value)
+
+		callback(value)
+	end
+
+	Bar.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1
+			or input.UserInputType == Enum.UserInputType.Touch then
+
+			draggingSlider = true
+			setValue(input.Position.X)
+		end
+	end)
+
+	UserInputService.InputChanged:Connect(function(input)
+		if not draggingSlider then
+			return
+		end
+
+		if input.UserInputType == Enum.UserInputType.MouseMovement
+			or input.UserInputType == Enum.UserInputType.Touch then
+
+			setValue(input.Position.X)
+		end
+	end)
+
+	UserInputService.InputEnded:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1
+			or input.UserInputType == Enum.UserInputType.Touch then
+
+			draggingSlider = false
+		end
+	end)
+
+	return Frame
+end
+
+createSlider(
+	AimContent,
+	"AIM SMOOTHNESS",
+	0.05,
+	1,
+	Settings.AimSmoothness,
+	function(value)
+		Settings.AimSmoothness = value
+	end
+)
+
+createSlider(
+	AimContent,
+	"AIM RANGE",
+	50,
+	1500,
+	Settings.AimRange,
+	function(value)
+		Settings.AimRange = math.floor(value)
+	end
+)
+
+--==================================================
+-- TARGET INFO
+--==================================================
+
+local TargetInfo = Instance.new("Frame")
+TargetInfo.Size = UDim2.new(1, -4, 0, 100)
+TargetInfo.BackgroundColor3 = COLORS.Panel2
+TargetInfo.Parent = AimContent
+
+corner(TargetInfo, 10)
+stroke(TargetInfo, COLORS.Pink, 1, 0.45)
+
+local TargetTitle = label(
+	TargetInfo,
+	"◎  CURRENT TARGET",
+	12,
+	COLORS.Pink,
+	Enum.Font.GothamBold
+)
+
+TargetTitle.Position = UDim2.fromOffset(16, 10)
+TargetTitle.Size = UDim2.new(1, -32, 0, 20)
+TargetTitle.TextXAlignment = Enum.TextXAlignment.Left
+
+local TargetLabel = label(
+	TargetInfo,
+	"No target",
+	13,
+	COLORS.White,
+	Enum.Font.GothamBold
+)
+
+TargetLabel.Position = UDim2.fromOffset(16, 38)
+TargetLabel.Size = UDim2.new(0.5, -20, 0, 22)
+TargetLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+local TargetStats = label(
+	TargetInfo,
+	"Distance: —     HP: —     ESP: —",
+	10,
+	COLORS.Gray,
+	Enum.Font.GothamMedium
+)
+
+TargetStats.Position = UDim2.fromOffset(16, 64)
+TargetStats.Size = UDim2.new(1, -32, 0, 18)
+TargetStats.TextXAlignment = Enum.TextXAlignment.Left
+
+--==================================================
+-- HITBOX PAGE
+--==================================================
+
+local HitboxPage, HitboxContent = createPage(
+	"HITBOXES",
+	"HITBOXES",
+	"Combat hitbox debugging and visualization"
+)
+
+createBackButton(HitboxPage)
+
+local function createValueControl(parent, titleText, value, minValue, maxValue, step, callback)
+	local Frame = Instance.new("Frame")
+	Frame.Size = UDim2.new(1, -4, 0, 64)
+	Frame.BackgroundColor3 = COLORS.Panel2
+	Frame.Parent = parent
+
+	corner(Frame, 10)
+	stroke(Frame, COLORS.DarkGray, 1)
+
+	local Title = label(
+		Frame,
+		titleText,
+		12,
+		COLORS.White,
+		Enum.Font.GothamBold
+	)
+
+	Title.Position = UDim2.fromOffset(16, 0)
+	Title.Size = UDim2.fromOffset(180, 64)
+	Title.TextXAlignment = Enum.TextXAlignment.Left
+
+	local Minus = Instance.new("TextButton")
+	Minus.Size = UDim2.fromOffset(38, 38)
+	Minus.Position = UDim2.new(1, -150, 0.5, -19)
+	Minus.BackgroundColor3 = COLORS.Panel
+	Minus.Text = "−"
+	Minus.TextColor3 = COLORS.White
+	Minus.TextSize = 20
+	Minus.Font = Enum.Font.GothamBold
+	Minus.AutoButtonColor = false
+	Minus.Parent = Frame
+
+	corner(Minus, 8)
+
+	local Value = label(
+		Frame,
+		"x" .. tostring(value),
+		13,
+		COLORS.Pink,
+		Enum.Font.GothamBold
+	)
+
+	Value.Position = UDim2.new(1, -105, 0, 0)
+	Value.Size = UDim2.fromOffset(65, 64)
+	Value.TextXAlignment = Enum.TextXAlignment.Center
+
+	local Plus = Instance.new("TextButton")
+	Plus.Size = UDim2.fromOffset(38, 38)
+	Plus.Position = UDim2.new(1, -55, 0.5, -19)
+	Plus.BackgroundColor3 = COLORS.Panel
+	Plus.Text = "+"
+	Plus.TextColor3 = COLORS.White
+	Plus.TextSize = 19
+	Plus.Font = Enum.Font.GothamBold
+	Plus.AutoButtonColor = false
+	Plus.Parent = Frame
+
+	corner(Plus, 8)
+
+	local function update(newValue)
+		value = math.clamp(
+			math.floor(newValue / step + 0.5) * step,
+			minValue,
+			maxValue
+		)
+
+		Value.Text = "x" .. tostring(value)
+		callback(value)
+	end
+
+	Minus.MouseButton1Click:Connect(function()
+		update(value - step)
+	end)
+
+	Plus.MouseButton1Click:Connect(function()
+		update(value + step)
+	end)
+
+	return Frame
+end
+
+createValueControl(
+	HitboxContent,
+	"PLAYER HITBOX",
+	Settings.PlayerHitbox,
+	1,
+	25,
+	0.5,
+	function(value)
+		Settings.PlayerHitbox = value
+		updatePlayerHitboxes()
+	end
+)
+
+createToggle(
+	HitboxContent,
+	"SHOW PLAYER HITBOXES",
+	"Display player hitbox debug volumes",
+	false,
+	function(value)
+		Settings.ShowPlayerHitboxes = value
+		updatePlayerHitboxes()
+	end
+)
+
+createValueControl(
+	HitboxContent,
+	"NPC HITBOX",
+	Settings.NpcHitbox,
+	1,
+	25,
+	0.5,
+	function(value)
+		Settings.NpcHitbox = value
+		updateNpcHitboxes()
+	end
+)
+
+createToggle(
+	HitboxContent,
+	"SHOW NPC HITBOXES",
+	"Display NPC hitbox debug volumes",
+	false,
+	function(value)
+		Settings.ShowNpcHitboxes = value
+		updateNpcHitboxes()
+	end
+)
+
+local ResetHitbox = Instance.new("TextButton")
+ResetHitbox.Size = UDim2.new(1, -4, 0, 48)
+ResetHitbox.BackgroundColor3 = COLORS.Panel2
+ResetHitbox.Text = "RESET HITBOX SETTINGS"
+ResetHitbox.TextColor3 = COLORS.White
+ResetHitbox.TextSize = 12
+ResetHitbox.Font = Enum.Font.GothamBold
+ResetHitbox.AutoButtonColor = false
+ResetHitbox.Parent = HitboxContent
+
+corner(ResetHitbox, 10)
+stroke(ResetHitbox, COLORS.Pink, 1, 0.5)
+
+ResetHitbox.MouseButton1Click:Connect(function()
+	Settings.PlayerHitbox = 1
+	Settings.NpcHitbox = 1
+
+	updatePlayerHitboxes()
+	updateNpcHitboxes()
+end)
+
+--==================================================
+-- DEBUG PAGE
+--==================================================
+
+local DebugPage, DebugContent = createPage(
+	"DEBUG",
+	"DEBUG",
+	"Performance and targeting diagnostics"
+)
+
+createBackButton(DebugPage)
+
+local DebugCard = Instance.new("Frame")
+DebugCard.Size = UDim2.new(1, -4, 0, 180)
+DebugCard.BackgroundColor3 = COLORS.Panel2
+DebugCard.Parent = DebugContent
+
+corner(DebugCard, 11)
+stroke(DebugCard, COLORS.DarkGray, 1)
+
+local DebugText = label(
+	DebugCard,
+	"",
+	12,
+	COLORS.White,
+	Enum.Font.Code
+)
+
+DebugText.Position = UDim2.fromOffset(16, 14)
+DebugText.Size = UDim2.new(1, -32, 1, -28)
+DebugText.TextXAlignment = Enum.TextXAlignment.Left
+DebugText.TextYAlignment = Enum.TextYAlignment.Top
+
+local DebugRefresh = Instance.new("TextButton")
+DebugRefresh.Size = UDim2.new(1, -4, 0, 48)
+DebugRefresh.BackgroundColor3 = COLORS.Panel2
+DebugRefresh.Text = "REFRESH DEBUG"
+DebugRefresh.TextColor3 = COLORS.White
+DebugRefresh.TextSize = 12
+DebugRefresh.Font = Enum.Font.GothamBold
+DebugRefresh.AutoButtonColor = false
+DebugRefresh.Parent = DebugContent
+
+corner(DebugRefresh, 10)
+stroke(DebugRefresh, COLORS.Pink, 1, 0.45)
+
+--==================================================
+-- MISC PAGE
+--==================================================
+
+local MiscPage, MiscContent = createPage(
+	"MISC",
+	"MISC",
+	"General interface and utility settings"
+)
+
+createBackButton(MiscPage)
+
+createToggle(
+	MiscContent,
+	"UI ANIMATIONS",
+	"Enable transitions and interaction animations",
+	true,
+	function(value)
+		Settings.Animations = value
+	end
+)
+
+createToggle(
+	MiscContent,
+	"UI SOUND",
+	"Reserved for interface sound effects",
+	true,
+	function(value)
+		-- reserved
+	end
+)
+
+local ResetUI = Instance.new("TextButton")
+ResetUI.Size = UDim2.new(1, -4, 0, 48)
+ResetUI.BackgroundColor3 = COLORS.Panel2
+ResetUI.Text = "RESET UI POSITION"
+ResetUI.TextColor3 = COLORS.White
+ResetUI.TextSize = 12
+ResetUI.Font = Enum.Font.GothamBold
+ResetUI.AutoButtonColor = false
+ResetUI.Parent = MiscContent
+
+corner(ResetUI, 10)
+stroke(ResetUI, COLORS.DarkGray, 1)
+
+--==================================================
+-- NAVIGATION
+--==================================================
+
+local NavButtons = {}
+
+local function registerNav(name, icon)
+	local button, iconObj, textObj, arrowObj, strokeObj =
+		createNavButton(icon, name)
+
+	NavButtons[name] = {
+		Button = button,
+		Icon = iconObj,
+		Text = textObj,
+		Arrow = arrowObj,
+		Stroke = strokeObj,
+	}
+
+	button.MouseButton1Click:Connect(function()
+		showPage(name)
+	end)
+end
+
+registerNav("AIM", "◎")
+registerNav("HITBOXES", "◇")
+registerNav("DEBUG", "⚙")
+registerNav("MISC", "✦")
+
+--==================================================
+-- SHOW PAGE
+--==================================================
+
+function showPage(name)
+	local pageData = Pages[name]
+
+	if not pageData then
+		return
+	end
+
+	local newPage = pageData.Frame
+
+	if CurrentPage == name then
+		return
+	end
+
+	local oldPage = CurrentPage and Pages[CurrentPage]
+
+	CurrentPage = name
+
+	for navName, data in pairs(NavButtons) do
+		local active = navName == name
+
+		if active then
+			tween(data.Button, 0.15, {
+				BackgroundColor3 = Color3.fromRGB(70, 15, 40)
+			})
+
+			tween(data.Icon, 0.15, {
+				TextColor3 = COLORS.Pink
+			})
+
+			tween(data.Arrow, 0.15, {
+				TextColor3 = COLORS.Pink
+			})
+
+			tween(data.Stroke, 0.15, {
+				Color = COLORS.Pink,
+				Transparency = 0.25
+			})
+		else
+			tween(data.Button, 0.15, {
+				BackgroundColor3 = COLORS.Panel2
+			})
+
+			tween(data.Icon, 0.15, {
+				TextColor3 = COLORS.Gray
+			})
+
+			tween(data.Arrow, 0.15, {
+				TextColor3 = COLORS.Gray
+			})
+
+			tween(data.Stroke, 0.15, {
+				Color = COLORS.DarkGray,
+				Transparency = 0
+			})
+		end
+	end
+
+	newPage.Visible = true
+
+	if not oldPage then
+		newPage.Position = UDim2.fromScale(0, 0)
+		return
+	end
+
+	if not Settings.Animations then
+		oldPage.Visible = false
+		newPage.Position = UDim2.fromScale(0, 0)
+		return
+	end
+
+	newPage.Position = UDim2.fromScale(1, 0)
+
+	tween(
+		oldPage,
+		0.22,
+		{
+			Position = UDim2.fromScale(-1, 0)
+		},
+		Enum.EasingStyle.Quart,
+		Enum.EasingDirection.In
+	)
+
+	tween(
+		newPage,
+		0.28,
+		{
+			Position = UDim2.fromScale(0, 0)
+		},
+		Enum.EasingStyle.Quart,
+		Enum.EasingDirection.Out
+	)
+
+	task.delay(0.3, function()
+		if oldPage then
+			oldPage.Visible = false
+		end
+	end)
+end
+
+--==================================================
+-- HOME NAVIGATION
+--==================================================
+
+function showPage(name)
+	local pageData = Pages[name]
+
+	if not pageData then
+		return
+	end
+
+	local newPage = pageData.Frame
+
+	if CurrentPage == name then
+		return
+	end
+
+	local oldPage = CurrentPage and Pages[CurrentPage]
+	CurrentPage = name
+
+	if name == "HOME" then
+		for _, data in pairs(NavButtons) do
+			tween(data.Button, 0.12, {
+				BackgroundColor3 = COLORS.Panel2
+			})
+		end
+	end
+
+	if oldPage == nil then
+		newPage.Visible = true
+		newPage.Position = UDim2.fromScale(0, 0)
+		return
+	end
+
+	newPage.Visible = true
+	newPage.Position = UDim2.fromScale(1, 0)
+
+	if Settings.Animations then
+		tween(
+			oldPage,
+			0.2,
+			{
+				Position = UDim2.fromScale(-1, 0)
+			},
+			Enum.EasingStyle.Quart,
+			Enum.EasingDirection.In
+		)
+
+		tween(
+			newPage,
+			0.25,
+			{
+				Position = UDim2.fromScale(0, 0)
+			},
+			Enum.EasingStyle.Quart,
+			Enum.EasingDirection.Out
+		)
+
+		task.delay(0.27, function()
+			if oldPage then
+				oldPage.Visible = false
+			end
+		end)
+	else
+		oldPage.Visible = false
+		newPage.Position = UDim2.fromScale(0, 0)
+	end
+end
+
+--==================================================
+-- AIM SYSTEM
+--==================================================
+
+local CurrentTarget = nil
+local CurrentNpcTarget = nil
+
+--==================================================
+-- ENEMY
 --==================================================
 
 local function isEnemy(player)
-
 	if player == LocalPlayer then
 		return false
 	end
 
-	if not player.Character then
+	local character = player.Character
+	if not character then
 		return false
 	end
 
-	local humanoid =
-		player.Character:FindFirstChildOfClass(
-			"Humanoid"
-		)
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
 
-	if not humanoid
-		or humanoid.Health <= 0 then
-
+	if not humanoid or humanoid.Health <= 0 then
 		return false
 	end
 
-	if LocalPlayer.Team
-		and player.Team then
-
-		return LocalPlayer.Team
-			~= player.Team
+	if LocalPlayer.Team and player.Team then
+		return LocalPlayer.Team ~= player.Team
 	end
 
 	return true
 end
 
 --==================================================
--- SYSTEM RED ESP DETECTOR
+-- RED ESP
 --==================================================
 
 local function isRedColor(color)
-
 	if not color then
 		return false
 	end
@@ -650,36 +1491,18 @@ local function isRedColor(color)
 end
 
 local function getSystemRedHighlight(player)
-
-	local character =
-		player.Character
+	local character = player.Character
 
 	if not character then
 		return nil
 	end
 
-	for _, object in ipairs(
-		character:GetDescendants()
-	) do
+	for _, object in ipairs(character:GetDescendants()) do
+		if object:IsA("Highlight")
+			and object.Enabled then
 
-		if object:IsA("Highlight") then
-
-			if not object.Enabled then
-				continue
-			end
-
-			local redFill =
-				isRedColor(
-					object.FillColor
-				)
-
-			local redOutline =
-				isRedColor(
-					object.OutlineColor
-				)
-
-			if redFill
-				or redOutline then
+			if isRedColor(object.FillColor)
+				or isRedColor(object.OutlineColor) then
 
 				return object
 			end
@@ -689,12 +1512,7 @@ local function getSystemRedHighlight(player)
 	return nil
 end
 
---==================================================
--- PLAYER AIM VALIDATION
---==================================================
-
 local function isValidAimTarget(player)
-
 	if not player then
 		return false
 	end
@@ -703,20 +1521,7 @@ local function isValidAimTarget(player)
 		return false
 	end
 
-	local highlight =
-		getSystemRedHighlight(
-			player
-		)
-
-	if not highlight then
-		return false
-	end
-
-	if not highlight.Enabled then
-		return false
-	end
-
-	return true
+	return getSystemRedHighlight(player) ~= nil
 end
 
 --==================================================
@@ -724,37 +1529,20 @@ end
 --==================================================
 
 local function getAimPart(character)
-
 	if not character then
 		return nil
 	end
 
 	if Settings.AimPart == "Head" then
-
-		return character:FindFirstChild(
-			"Head"
-		)
-
+		return character:FindFirstChild("Head")
 	elseif Settings.AimPart == "Torso" then
-
-		return character:FindFirstChild(
-			"UpperTorso"
-		)
-			or character:FindFirstChild(
-				"Torso"
-			)
-
-	elseif Settings.AimPart ==
-		"HumanoidRootPart" then
-
-		return character:FindFirstChild(
-			"HumanoidRootPart"
-		)
+		return character:FindFirstChild("UpperTorso")
+			or character:FindFirstChild("Torso")
+	elseif Settings.AimPart == "HumanoidRootPart" then
+		return character:FindFirstChild("HumanoidRootPart")
 	end
 
-	return character:FindFirstChild(
-		"Head"
-	)
+	return character:FindFirstChild("Head")
 end
 
 --==================================================
@@ -762,864 +1550,381 @@ end
 --==================================================
 
 local function getLocalRoot()
-
-	local character =
-		LocalPlayer.Character
+	local character = LocalPlayer.Character
 
 	if not character then
 		return nil
 	end
 
-	return character:FindFirstChild(
-		"HumanoidRootPart"
-	)
+	return character:FindFirstChild("HumanoidRootPart")
 end
 
 --==================================================
--- CURRENT TARGETS
---==================================================
-
-local CurrentTarget = nil
-local CurrentNpcTarget = nil
-
---==================================================
--- FIND NEAREST PLAYER WITH SYSTEM ESP
+-- PLAYER TARGET
 --==================================================
 
 local function getAimTarget()
-
-	local localRoot =
-		getLocalRoot()
+	local localRoot = getLocalRoot()
 
 	if not localRoot then
-
 		CurrentTarget = nil
-
 		return nil
 	end
 
 	local closestPlayer = nil
 	local closestPart = nil
-	local closestDistance =
-		Settings.AimRange
+	local closestDistance = Settings.AimRange
 
-	for _, player in ipairs(
-		Players:GetPlayers()
-	) do
-
+	for _, player in ipairs(Players:GetPlayers()) do
 		if isValidAimTarget(player) then
 
-			local character =
-				player.Character
+			local character = player.Character
+			local root = character
+				and character:FindFirstChild("HumanoidRootPart")
 
-			local humanoid =
-				character:FindFirstChildOfClass(
-					"Humanoid"
-				)
+			local humanoid = character
+				and character:FindFirstChildOfClass("Humanoid")
 
-			local root =
-				character:FindFirstChild(
-					"HumanoidRootPart"
-				)
-
-			if humanoid
-				and humanoid.Health > 0
-				and root then
+			if root
+				and humanoid
+				and humanoid.Health > 0 then
 
 				local distance =
-					(
-						root.Position
-						- localRoot.Position
-					).Magnitude
+					(root.Position - localRoot.Position).Magnitude
 
-				if distance <=
-					Settings.AimRange
-					and distance <
-					closestDistance then
+				if distance <= Settings.AimRange
+					and distance < closestDistance then
 
-					local part =
-						getAimPart(
-							character
-						)
+					local part = getAimPart(character)
 
 					if part then
-
-						closestDistance =
-							distance
-
-						closestPlayer =
-							player
-
-						closestPart =
-							part
+						closestDistance = distance
+						closestPlayer = player
+						closestPart = part
 					end
 				end
 			end
 		end
 	end
 
-	CurrentTarget =
-		closestPlayer
+	CurrentTarget = closestPlayer
 
 	return closestPart
 end
 
 --==================================================
--- NPC CHECK
+-- NPC CACHE
 --==================================================
 
-local function isNPC(model)
+local NpcCache = {}
 
+local function isNPC(model)
 	if not model:IsA("Model") then
 		return false
 	end
 
-	if Players:GetPlayerFromCharacter(
-		model
-	) then
-
+	if Players:GetPlayerFromCharacter(model) then
 		return false
 	end
 
-	local humanoid =
-		model:FindFirstChildOfClass(
-			"Humanoid"
-		)
+	local humanoid = model:FindFirstChildOfClass("Humanoid")
+	local root = model:FindFirstChild("HumanoidRootPart")
 
-	local root =
-		model:FindFirstChild(
-			"HumanoidRootPart"
-		)
-
-	if not humanoid
-		or not root then
-
+	if not humanoid or not root then
 		return false
 	end
 
-	if humanoid.Health <= 0 then
-		return false
-	end
-
-	return true
+	return humanoid.Health > 0
 end
 
+local function rebuildNpcCache()
+	table.clear(NpcCache)
+
+	for _, object in ipairs(workspace:GetDescendants()) do
+		if isNPC(object) then
+			table.insert(NpcCache, object)
+		end
+	end
+end
+
+workspace.DescendantAdded:Connect(function(object)
+	if object:IsA("Model") and isNPC(object) then
+		if not table.find(NpcCache, object) then
+			table.insert(NpcCache, object)
+		end
+	end
+end)
+
+workspace.DescendantRemoving:Connect(function(object)
+	local index = table.find(NpcCache, object)
+
+	if index then
+		table.remove(NpcCache, index)
+	end
+end)
+
 --==================================================
--- FIND NEAREST NPC
+-- NPC TARGET
 --==================================================
 
 local function getNpcAimTarget()
-
-	local localRoot =
-		getLocalRoot()
+	local localRoot = getLocalRoot()
 
 	if not localRoot then
-
-		CurrentNpcTarget =
-			nil
-
+		CurrentNpcTarget = nil
 		return nil
 	end
 
 	local closestNpc = nil
 	local closestPart = nil
-	local closestDistance =
-		Settings.AimRange
+	local closestDistance = Settings.AimRange
 
-	for _, object in ipairs(
-		workspace:GetDescendants()
-	) do
+	for i = #NpcCache, 1, -1 do
+		local npc = NpcCache[i]
 
-		if isNPC(object) then
+		if not npc or not npc.Parent then
+			table.remove(NpcCache, i)
+			continue
+		end
 
-			local humanoid =
-				object:FindFirstChildOfClass(
-					"Humanoid"
-				)
+		local humanoid =
+			npc:FindFirstChildOfClass("Humanoid")
 
-			local root =
-				object:FindFirstChild(
-					"HumanoidRootPart"
-				)
+		local root =
+			npc:FindFirstChild("HumanoidRootPart")
 
-			if humanoid
-				and humanoid.Health > 0
-				and root then
+		if humanoid
+			and humanoid.Health > 0
+			and root then
 
-				local distance =
-					(
-						root.Position
-						- localRoot.Position
-					).Magnitude
+			local distance =
+				(root.Position - localRoot.Position).Magnitude
 
-				if distance <=
-					Settings.AimRange
-					and distance <
-					closestDistance then
+			if distance <= Settings.AimRange
+				and distance < closestDistance then
 
-					local part =
-						getAimPart(
-							object
-						)
+				local part = getAimPart(npc)
 
-					if part then
-
-						closestDistance =
-							distance
-
-						closestNpc =
-							object
-
-						closestPart =
-							part
-					end
+				if part then
+					closestDistance = distance
+					closestNpc = npc
+					closestPart = part
 				end
 			end
 		end
 	end
 
-	CurrentNpcTarget =
-		closestNpc
+	CurrentNpcTarget = closestNpc
 
 	return closestPart
 end
 
 --==================================================
--- PLAYER AIMBOT BUTTON
---==================================================
-
-local AimbotButton =
-	createButton(
-		"PLAYER AIMBOT: OFF"
-	)
-
-AimbotButton.MouseButton1Click:Connect(
-	function()
-
-		Settings.Aimbot =
-			not Settings.Aimbot
-
-		if Settings.Aimbot then
-
-			AimbotButton.Text =
-				"PLAYER AIMBOT: ON"
-
-			AimbotButton.TextColor3 =
-				Color3.fromRGB(
-					255,
-					50,
-					110
-				)
-
-		else
-
-			AimbotButton.Text =
-				"PLAYER AIMBOT: OFF"
-
-			AimbotButton.TextColor3 =
-				Color3.fromRGB(
-					255,
-					255,
-					255
-				)
-
-			CurrentTarget =
-				nil
-		end
-	end
-)
-
---==================================================
--- NPC AIMBOT BUTTON
---==================================================
-
-local NpcAimbotButton =
-	createButton(
-		"NPC AIMBOT: OFF"
-	)
-
-NpcAimbotButton.MouseButton1Click:Connect(
-	function()
-
-		Settings.NpcAimbot =
-			not Settings.NpcAimbot
-
-		if Settings.NpcAimbot then
-
-			NpcAimbotButton.Text =
-				"NPC AIMBOT: ON"
-
-			NpcAimbotButton.TextColor3 =
-				Color3.fromRGB(
-					255,
-					50,
-					110
-				)
-
-		else
-
-			NpcAimbotButton.Text =
-				"NPC AIMBOT: OFF"
-
-			NpcAimbotButton.TextColor3 =
-				Color3.fromRGB(
-					255,
-					255,
-					255
-				)
-
-			CurrentNpcTarget =
-				nil
-		end
-	end
-)
-
---==================================================
--- GOD MODE BUTTON
---==================================================
-
-local GodModeButton =
-	createButton(
-		"GOD MODE: OFF"
-	)
-
-GodModeButton.MouseButton1Click:Connect(
-	function()
-
-		Settings.GodMode =
-			not Settings.GodMode
-
-		GodModeEvent:FireServer(
-			Settings.GodMode
-		)
-
-		if Settings.GodMode then
-
-			GodModeButton.Text =
-				"GOD MODE: ON"
-
-			GodModeButton.TextColor3 =
-				Color3.fromRGB(
-					255,
-					50,
-					110
-				)
-
-		else
-
-			GodModeButton.Text =
-				"GOD MODE: OFF"
-
-			GodModeButton.TextColor3 =
-				Color3.fromRGB(
-					255,
-					255,
-					255
-				)
-		end
-	end
-)
-
---==================================================
--- AIM PART BUTTON
---==================================================
-
-local AimPartButton =
-	createButton(
-		"AIM PART: HEAD"
-	)
-
-AimPartButton.MouseButton1Click:Connect(
-	function()
-
-		if Settings.AimPart ==
-			"Head" then
-
-			Settings.AimPart =
-				"Torso"
-
-		elseif Settings.AimPart ==
-			"Torso" then
-
-			Settings.AimPart =
-				"HumanoidRootPart"
-
-		else
-
-			Settings.AimPart =
-				"Head"
-		end
-
-		AimPartButton.Text =
-			"AIM PART: "
-			.. string.upper(
-				Settings.AimPart
-			)
-	end
-)
-
---==================================================
--- SMOOTH BUTTON
---==================================================
-
-local SmoothButton =
-	createButton(
-		"AIM SMOOTH: "
-		.. tostring(
-			Settings.AimSmoothness
-		)
-	)
-
-SmoothButton.MouseButton1Click:Connect(
-	function()
-
-		Settings.AimSmoothness +=
-			0.05
-
-		if Settings.AimSmoothness > 0.8 then
-			Settings.AimSmoothness = 0.1
-		end
-
-		Settings.AimSmoothness =
-			math.floor(
-				Settings.AimSmoothness * 100
-			) / 100
-
-		SmoothButton.Text =
-			"AIM SMOOTH: "
-			.. tostring(
-				Settings.AimSmoothness
-			)
-	end
-)
-
---==================================================
--- PLAYER HITBOXES
+-- HITBOX VISUALIZATION
 --==================================================
 
 local PlayerHitboxObjects = {}
+local NpcHitboxObjects = {}
 
-local function createHitbox(player)
-
+function createHitbox(player)
 	if not player.Character then
 		return
 	end
 
 	local root =
-		player.Character:FindFirstChild(
-			"HumanoidRootPart"
-		)
+		player.Character:FindFirstChild("HumanoidRootPart")
 
 	if not root then
 		return
 	end
 
 	if PlayerHitboxObjects[player] then
-
 		PlayerHitboxObjects[player]:Destroy()
-
-		PlayerHitboxObjects[player] =
-			nil
+		PlayerHitboxObjects[player] = nil
 	end
 
 	if not Settings.ShowPlayerHitboxes then
 		return
 	end
 
-	local box =
-		Instance.new(
-			"BoxHandleAdornment"
-		)
+	local box = Instance.new("BoxHandleAdornment")
+	box.Name = "AdminPlayerHitbox"
+	box.Adornee = root
+	box.Size = root.Size * Settings.PlayerHitbox
+	box.Color3 = COLORS.Pink
+	box.Transparency = 0.78
+	box.AlwaysOnTop = true
+	box.ZIndex = 5
+	box.Parent = root
 
-	box.Name =
-		"AdminPlayerHitbox"
-
-	box.Adornee =
-		root
-
-	box.Size =
-		root.Size *
-		Settings.PlayerHitbox
-
-	box.Color3 =
-		Color3.fromRGB(
-			255,
-			50,
-			100
-		)
-
-	box.Transparency =
-		0.75
-
-	box.AlwaysOnTop =
-		true
-
-	box.ZIndex =
-		5
-
-	box.Parent =
-		root
-
-	PlayerHitboxObjects[player] =
-		box
+	PlayerHitboxObjects[player] = box
 end
 
-local function updatePlayerHitboxes()
-
-	for _, player in ipairs(
-		Players:GetPlayers()
-	) do
-
+function updatePlayerHitboxes()
+	for _, player in ipairs(Players:GetPlayers()) do
 		if player ~= LocalPlayer then
 			createHitbox(player)
 		end
 	end
 end
 
-local PlayerHitboxButton =
-	createButton(
-		"PLAYER HITBOX: x"
-		.. Settings.PlayerHitbox
-	)
-
-PlayerHitboxButton.MouseButton1Click:Connect(
-	function()
-
-		Settings.PlayerHitbox +=
-			0.5
-
-		if Settings.PlayerHitbox > 5 then
-			Settings.PlayerHitbox = 1
-		end
-
-		PlayerHitboxButton.Text =
-			"PLAYER HITBOX: x"
-			.. Settings.PlayerHitbox
-
-		updatePlayerHitboxes()
-	end
-)
-
-local ShowPlayerButton =
-	createButton(
-		"SHOW PLAYER HITBOXES: OFF"
-	)
-
-ShowPlayerButton.MouseButton1Click:Connect(
-	function()
-
-		Settings.ShowPlayerHitboxes =
-			not Settings.ShowPlayerHitboxes
-
-		if Settings.ShowPlayerHitboxes then
-
-			ShowPlayerButton.Text =
-				"SHOW PLAYER HITBOXES: ON"
-
-			ShowPlayerButton.TextColor3 =
-				Color3.fromRGB(
-					255,
-					50,
-					110
-				)
-
-		else
-
-			ShowPlayerButton.Text =
-				"SHOW PLAYER HITBOXES: OFF"
-
-			ShowPlayerButton.TextColor3 =
-				Color3.fromRGB(
-					255,
-					255,
-					255
-				)
-		end
-
-		updatePlayerHitboxes()
-	end
-)
-
---==================================================
--- NPC HITBOXES
---==================================================
-
-local NpcHitboxObjects = {}
-
-local function updateNpcHitboxes()
-
-	for model, object in pairs(
-		NpcHitboxObjects
-	) do
-
+function updateNpcHitboxes()
+	for model, object in pairs(NpcHitboxObjects) do
 		if object then
 			object:Destroy()
 		end
 
-		NpcHitboxObjects[model] =
-			nil
+		NpcHitboxObjects[model] = nil
 	end
 
 	if not Settings.ShowNpcHitboxes then
 		return
 	end
 
-	for _, object in ipairs(
-		workspace:GetDescendants()
-	) do
-
-		if isNPC(object) then
-
-			local root =
-				object:FindFirstChild(
-					"HumanoidRootPart"
-				)
+	for _, npc in ipairs(NpcCache) do
+		if npc and npc.Parent then
+			local root = npc:FindFirstChild("HumanoidRootPart")
 
 			if root then
+				local box = Instance.new("BoxHandleAdornment")
+				box.Name = "AdminNPCHitbox"
+				box.Adornee = root
+				box.Size = root.Size * Settings.NpcHitbox
+				box.Color3 = COLORS.Pink
+				box.Transparency = 0.78
+				box.AlwaysOnTop = true
+				box.ZIndex = 5
+				box.Parent = root
 
-				local box =
-					Instance.new(
-						"BoxHandleAdornment"
-					)
-
-				box.Name =
-					"AdminNPCHitbox"
-
-				box.Adornee =
-					root
-
-				box.Size =
-					root.Size *
-					Settings.NpcHitbox
-
-				box.Color3 =
-					Color3.fromRGB(
-						255,
-						50,
-						100
-					)
-
-				box.Transparency =
-					0.75
-
-				box.AlwaysOnTop =
-					true
-
-				box.ZIndex =
-					5
-
-				box.Parent =
-					root
-
-				NpcHitboxObjects[object] =
-					box
+				NpcHitboxObjects[npc] = box
 			end
 		end
 	end
 end
 
-local NpcHitboxButton =
-	createButton(
-		"NPC HITBOX: x"
-		.. Settings.NpcHitbox
-	)
-
-NpcHitboxButton.MouseButton1Click:Connect(
-	function()
-
-		Settings.NpcHitbox +=
-			0.5
-
-		if Settings.NpcHitbox > 5 then
-			Settings.NpcHitbox = 1
-		end
-
-		NpcHitboxButton.Text =
-			"NPC HITBOX: x"
-			.. Settings.NpcHitbox
-
-		updateNpcHitboxes()
-	end
-)
-
-local ShowNpcButton =
-	createButton(
-		"SHOW NPC HITBOXES: OFF"
-	)
-
-ShowNpcButton.MouseButton1Click:Connect(
-	function()
-
-		Settings.ShowNpcHitboxes =
-			not Settings.ShowNpcHitboxes
-
-		if Settings.ShowNpcHitboxes then
-
-			ShowNpcButton.Text =
-				"SHOW NPC HITBOXES: ON"
-
-			ShowNpcButton.TextColor3 =
-				Color3.fromRGB(
-					255,
-					50,
-					110
-				)
-
-		else
-
-			ShowNpcButton.Text =
-				"SHOW NPC HITBOXES: OFF"
-
-			ShowNpcButton.TextColor3 =
-				Color3.fromRGB(
-					255,
-					255,
-					255
-				)
-		end
-
-		updateNpcHitboxes()
-	end
-)
-
 --==================================================
--- RESET HITBOXES
+-- DEBUG UPDATE
 --==================================================
 
-local ResetButton =
-	createButton(
-		"RESET HITBOXES"
-	)
+local function updateDebug()
+	local fps = math.floor(1 / math.max(RunService.RenderStepped:Wait(), 0.001))
 
-ResetButton.MouseButton1Click:Connect(
-	function()
+	local playerTargetText = "None"
+	local npcTargetText = "None"
 
-		Settings.PlayerHitbox = 1
-		Settings.NpcHitbox = 1
-
-		PlayerHitboxButton.Text =
-			"PLAYER HITBOX: x1"
-
-		NpcHitboxButton.Text =
-			"NPC HITBOX: x1"
-
-		updatePlayerHitboxes()
-		updateNpcHitboxes()
-	end
-)
-
---==================================================
--- PLAYER EVENTS
---==================================================
-
-local function setupPlayer(player)
-
-	if player == LocalPlayer then
-		return
+	if CurrentTarget then
+		playerTargetText = CurrentTarget.Name
 	end
 
-	player.CharacterAdded:Connect(
-		function()
-
-			if CurrentTarget == player then
-				CurrentTarget = nil
-			end
-
-			task.wait(0.5)
-
-			createHitbox(player)
-		end
-	)
-
-	if player.Character then
-
-		task.defer(
-			function()
-				createHitbox(player)
-			end
-		)
+	if CurrentNpcTarget then
+		npcTargetText = CurrentNpcTarget.Name
 	end
 
-	player:GetPropertyChangedSignal(
-		"Team"
-	):Connect(
-		function()
-
-			if CurrentTarget == player
-				and not isEnemy(player) then
-
-				CurrentTarget = nil
-			end
-		end
-	)
+	DebugText.Text =
+		"COMBAT DEBUG\n\n" ..
+		"Player Aimbot    : " .. tostring(Settings.PlayerAimbot) .. "\n" ..
+		"NPC Aimbot       : " .. tostring(Settings.NpcAimbot) .. "\n\n" ..
+		"NPC Cache        : " .. tostring(#NpcCache) .. "\n" ..
+		"Player Target    : " .. playerTargetText .. "\n" ..
+		"NPC Target       : " .. npcTargetText .. "\n\n" ..
+		"Player Hitbox    : x" .. tostring(Settings.PlayerHitbox) .. "\n" ..
+		"NPC Hitbox       : x" .. tostring(Settings.NpcHitbox)
 end
 
-for _, player in ipairs(
-	Players:GetPlayers()
-) do
-
-	setupPlayer(player)
-end
-
-Players.PlayerAdded:Connect(
-	setupPlayer
-)
-
-Players.PlayerRemoving:Connect(
-	function(player)
-
-		if CurrentTarget == player then
-			CurrentTarget = nil
-		end
-
-		if PlayerHitboxObjects[player] then
-
-			PlayerHitboxObjects[player]:Destroy()
-
-			PlayerHitboxObjects[player] =
-				nil
-		end
-	end
-)
+DebugRefresh.MouseButton1Click:Connect(updateDebug)
 
 --==================================================
--- AIMBOT
+-- TARGET INFO UPDATE
+--==================================================
+
+local function updateTargetInfo()
+	if CurrentTarget then
+		local character = CurrentTarget.Character
+		local humanoid = character
+			and character:FindFirstChildOfClass("Humanoid")
+		local root = character
+			and character:FindFirstChild("HumanoidRootPart")
+
+		local localRoot = getLocalRoot()
+
+		local distance = 0
+
+		if root and localRoot then
+			distance =
+				(root.Position - localRoot.Position).Magnitude
+		end
+
+		TargetLabel.Text =
+			CurrentTarget.Name
+
+		TargetStats.Text =
+			"Distance: "
+			.. math.floor(distance)
+			.. "     HP: "
+			.. (humanoid and math.floor(humanoid.Health) or 0)
+			.. "     ESP: ACTIVE"
+
+	elseif CurrentNpcTarget then
+
+		local humanoid =
+			CurrentNpcTarget:FindFirstChildOfClass("Humanoid")
+
+		local root =
+			CurrentNpcTarget:FindFirstChild("HumanoidRootPart")
+
+		local localRoot = getLocalRoot()
+
+		local distance = 0
+
+		if root and localRoot then
+			distance =
+				(root.Position - localRoot.Position).Magnitude
+		end
+
+		TargetLabel.Text =
+			"NPC: " .. CurrentNpcTarget.Name
+
+		TargetStats.Text =
+			"Distance: "
+			.. math.floor(distance)
+			.. "     HP: "
+			.. (humanoid and math.floor(humanoid.Health) or 0)
+			.. "     ESP: —"
+
+	else
+
+		TargetLabel.Text = "No target"
+		TargetStats.Text = "Distance: —     HP: —     ESP: —"
+	end
+end
+
+--==================================================
+-- AIM LOOP
 --==================================================
 
 RunService:BindToRenderStep(
-	"CombatAdminAimbot",
+	"CombatAdminAimbotV2",
 	Enum.RenderPriority.Camera.Value + 1,
 	function()
+		local Camera = workspace.CurrentCamera
 
-		-- BOTH OFF
-		if not Settings.Aimbot
-			and not Settings.NpcAimbot then
-
-			CurrentTarget = nil
-			CurrentNpcTarget = nil
-
+		if not Camera then
 			return
 		end
 
-		--==================================================
-		-- PLAYER AIMBOT
-		--==================================================
+		-- PLAYER AIM
 
-		if Settings.Aimbot then
+		if Settings.PlayerAimbot then
+			local target = getAimTarget()
 
-			local playerTarget =
-				getAimTarget()
-
-			if playerTarget
+			if target
 				and CurrentTarget
-				and isValidAimTarget(
-					CurrentTarget
-				) then
+				and isValidAimTarget(CurrentTarget) then
 
 				local targetCFrame =
 					CFrame.lookAt(
 						Camera.CFrame.Position,
-						playerTarget.Position
+						target.Position
 					)
 
 				Camera.CFrame =
@@ -1628,46 +1933,29 @@ RunService:BindToRenderStep(
 						Settings.AimSmoothness
 					)
 
+				updateTargetInfo()
 				return
 			end
-
-			CurrentTarget = nil
-
 		else
-
 			CurrentTarget = nil
 		end
 
-		--==================================================
-		-- NPC AIMBOT
-		--==================================================
+		-- NPC AIM
 
 		if Settings.NpcAimbot then
+			local target = getNpcAimTarget()
 
-			local npcTarget =
-				getNpcAimTarget()
-
-			if npcTarget
+			if target
 				and CurrentNpcTarget then
 
 				local humanoid =
-					CurrentNpcTarget:FindFirstChildOfClass(
-						"Humanoid"
-					)
+					CurrentNpcTarget:FindFirstChildOfClass("Humanoid")
 
-				local root =
-					CurrentNpcTarget:FindFirstChild(
-						"HumanoidRootPart"
-					)
-
-				if humanoid
-					and humanoid.Health > 0
-					and root then
-
+				if humanoid and humanoid.Health > 0 then
 					local targetCFrame =
 						CFrame.lookAt(
 							Camera.CFrame.Position,
-							npcTarget.Position
+							target.Position
 						)
 
 					Camera.CFrame =
@@ -1676,18 +1964,68 @@ RunService:BindToRenderStep(
 							Settings.AimSmoothness
 						)
 
+					updateTargetInfo()
 					return
 				end
 			end
-
-			CurrentNpcTarget = nil
-
 		else
-
 			CurrentNpcTarget = nil
 		end
+
+		updateTargetInfo()
 	end
 )
+
+--==================================================
+-- PLAYER EVENTS
+--==================================================
+
+local function setupPlayer(player)
+	if player == LocalPlayer then
+		return
+	end
+
+	player.CharacterAdded:Connect(function()
+		if CurrentTarget == player then
+			CurrentTarget = nil
+		end
+
+		task.wait(0.4)
+
+		createHitbox(player)
+	end)
+
+	player:GetPropertyChangedSignal("Team"):Connect(function()
+		if CurrentTarget == player
+			and not isEnemy(player) then
+
+			CurrentTarget = nil
+		end
+	end)
+
+	if player.Character then
+		task.defer(function()
+			createHitbox(player)
+		end)
+	end
+end
+
+for _, player in ipairs(Players:GetPlayers()) do
+	setupPlayer(player)
+end
+
+Players.PlayerAdded:Connect(setupPlayer)
+
+Players.PlayerRemoving:Connect(function(player)
+	if CurrentTarget == player then
+		CurrentTarget = nil
+	end
+
+	if PlayerHitboxObjects[player] then
+		PlayerHitboxObjects[player]:Destroy()
+		PlayerHitboxObjects[player] = nil
+	end
+end)
 
 --==================================================
 -- DRAGGING
@@ -1697,106 +2035,79 @@ local dragging = false
 local dragStart
 local startPosition
 
-Header.InputBegan:Connect(
-	function(input)
+Header.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1
+		or input.UserInputType == Enum.UserInputType.Touch then
 
-		if input.UserInputType ==
-			Enum.UserInputType.MouseButton1
-			or input.UserInputType ==
-			Enum.UserInputType.Touch then
-
-			dragging = true
-
-			dragStart =
-				input.Position
-
-			startPosition =
-				Main.Position
-		end
+		dragging = true
+		dragStart = input.Position
+		startPosition = Main.Position
 	end
-)
+end)
 
-Header.InputEnded:Connect(
-	function(input)
+Header.InputEnded:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1
+		or input.UserInputType == Enum.UserInputType.Touch then
 
-		if input.UserInputType ==
-			Enum.UserInputType.MouseButton1
-			or input.UserInputType ==
-			Enum.UserInputType.Touch then
-
-			dragging = false
-		end
+		dragging = false
 	end
-)
+end)
 
-UserInputService.InputChanged:Connect(
-	function(input)
-
-		if not dragging then
-			return
-		end
-
-		if input.UserInputType ~=
-			Enum.UserInputType.MouseMovement
-			and input.UserInputType ~=
-			Enum.UserInputType.Touch then
-
-			return
-		end
-
-		local delta =
-			input.Position -
-			dragStart
-
-		Main.Position =
-			UDim2.new(
-				startPosition.X.Scale,
-				startPosition.X.Offset
-					+ delta.X,
-
-				startPosition.Y.Scale,
-				startPosition.Y.Offset
-					+ delta.Y
-			)
+UserInputService.InputChanged:Connect(function(input)
+	if not dragging then
+		return
 	end
-)
+
+	if input.UserInputType ~= Enum.UserInputType.MouseMovement
+		and input.UserInputType ~= Enum.UserInputType.Touch then
+		return
+	end
+
+	local delta =
+		input.Position - dragStart
+
+	Main.Position =
+		UDim2.new(
+			startPosition.X.Scale,
+			startPosition.X.Offset + delta.X,
+			startPosition.Y.Scale,
+			startPosition.Y.Offset + delta.Y
+		)
+end)
 
 --==================================================
--- OPEN / CLOSE ANIMATION
+-- OPEN / CLOSE
 --==================================================
 
 local function openPanel()
+	Main.Visible = true
 
-	Main.Visible =
-		true
+	if Settings.Animations then
+		Main.Size = UDim2.fromOffset(850, 0)
 
-	Main.Size =
-		UDim2.fromOffset(
-			310,
-			0
-		)
-
-	TweenService:Create(
-		Main,
-		TweenInfo.new(
-			0.25,
+		tween(
+			Main,
+			0.3,
+			{
+				Size = UDim2.fromOffset(950, 570)
+			},
 			Enum.EasingStyle.Back,
 			Enum.EasingDirection.Out
-		),
-		{
-			Size =
-				UDim2.fromOffset(
-					310,
-					500
-				)
-		}
-	):Play()
+		)
+	else
+		Main.Size = UDim2.fromOffset(950, 570)
+	end
+
+	showPage("HOME")
 end
 
 local function closePanel()
+	if not Main.Visible then
+		return
+	end
 
-	local tween =
-		TweenService:Create(
+	if Settings.Animations then
+		local t = TweenService:Create(
 			Main,
 			TweenInfo.new(
 				0.2,
@@ -1804,131 +2115,107 @@ local function closePanel()
 				Enum.EasingDirection.In
 			),
 			{
-				Size =
-					UDim2.fromOffset(
-						310,
-						0
-					)
+				Size = UDim2.fromOffset(950, 0)
 			}
 		)
 
-	tween:Play()
+		t:Play()
 
-	tween.Completed:Connect(
-		function()
-			Main.Visible =
-				false
-		end
-	)
+		t.Completed:Connect(function()
+			Main.Visible = false
+		end)
+	else
+		Main.Visible = false
+	end
 end
 
-OpenButton.MouseButton1Click:Connect(
-	function()
+OpenButton.MouseButton1Click:Connect(function()
+	if Main.Visible then
+		closePanel()
+	else
+		openPanel()
+	end
+end)
 
+Close.MouseButton1Click:Connect(closePanel)
+
+--==================================================
+-- KEYBOARD
+--==================================================
+
+UserInputService.InputBegan:Connect(function(input, processed)
+	if processed then
+		return
+	end
+
+	-- RightShift
+	if input.KeyCode == Enum.KeyCode.RightShift then
 		if Main.Visible then
 			closePanel()
 		else
 			openPanel()
 		end
 	end
-)
 
-Close.MouseButton1Click:Connect(
-	function()
-		closePanel()
+	-- H
+	if input.KeyCode == Enum.KeyCode.H then
+		Settings.ShowPlayerHitboxes =
+			not Settings.ShowPlayerHitboxes
+
+		updatePlayerHitboxes()
 	end
-)
 
---==================================================
--- KEYBOARD
---==================================================
+	-- [ ]
+	if input.KeyCode == Enum.KeyCode.RightBracket then
+		Settings.PlayerHitbox =
+			math.min(
+				Settings.PlayerHitbox + 0.5,
+				25
+			)
 
-UserInputService.InputBegan:Connect(
-	function(input, processed)
-
-		if processed then
-			return
-		end
-
-		-- RightShift = OPEN / CLOSE
-
-		if input.KeyCode ==
-			Enum.KeyCode.RightShift then
-
-			if Main.Visible then
-				closePanel()
-			else
-				openPanel()
-			end
-		end
-
-		-- ] = INCREASE PLAYER HITBOX
-
-		if input.KeyCode ==
-			Enum.KeyCode.RightBracket then
-
-			Settings.PlayerHitbox +=
-				0.5
-
-			if Settings.PlayerHitbox > 5 then
-				Settings.PlayerHitbox = 1
-			end
-
-			PlayerHitboxButton.Text =
-				"PLAYER HITBOX: x"
-				.. Settings.PlayerHitbox
-
-			updatePlayerHitboxes()
-		end
-
-		-- [ = DECREASE PLAYER HITBOX
-
-		if input.KeyCode ==
-			Enum.KeyCode.LeftBracket then
-
-			Settings.PlayerHitbox -=
-				0.5
-
-			if Settings.PlayerHitbox < 1 then
-				Settings.PlayerHitbox = 5
-			end
-
-			PlayerHitboxButton.Text =
-				"PLAYER HITBOX: x"
-				.. Settings.PlayerHitbox
-
-			updatePlayerHitboxes()
-		end
-
-		-- H = PLAYER HITBOXES
-
-		if input.KeyCode ==
-			Enum.KeyCode.H then
-
-			Settings.ShowPlayerHitboxes =
-				not Settings.ShowPlayerHitboxes
-
-			if Settings.ShowPlayerHitboxes then
-
-				ShowPlayerButton.Text =
-					"SHOW PLAYER HITBOXES: ON"
-
-			else
-
-				ShowPlayerButton.Text =
-					"SHOW PLAYER HITBOXES: OFF"
-			end
-
-			updatePlayerHitboxes()
-		end
+		updatePlayerHitboxes()
 	end
-)
+
+	if input.KeyCode == Enum.KeyCode.LeftBracket then
+		Settings.PlayerHitbox =
+			math.max(
+				Settings.PlayerHitbox - 0.5,
+				1
+			)
+
+		updatePlayerHitboxes()
+	end
+end)
 
 --==================================================
--- INITIAL
+-- RESET UI
 --==================================================
 
-task.wait(1)
+ResetUI.MouseButton1Click:Connect(function()
+	Main.Position =
+		UDim2.new(
+			0.5,
+			-475,
+			0.5,
+			-285
+		)
+
+	Main.Size =
+		UDim2.fromOffset(950, 570)
+end)
+
+--==================================================
+-- INITIALIZE
+--==================================================
+
+rebuildNpcCache()
+
+task.wait(0.5)
 
 updatePlayerHitboxes()
 updateNpcHitboxes()
+
+-- Начальная страница
+showPage("HOME")
+
+print("[Combat Admin Panel V2] Loaded")
