@@ -378,13 +378,30 @@ PageContainer.Parent = Main
 local Pages = {}
 
 local function createPage(name)
-	local page = Instance.new("Frame")
+	local page = Instance.new("ScrollingFrame")
 	page.Name = name
 	page.Size = UDim2.fromScale(1, 1)
 	page.Position = UDim2.fromScale(0, 0)
 	page.BackgroundTransparency = 1
+	page.BorderSizePixel = 0
 	page.Visible = false
 	page.ZIndex = 10
+
+	page.Active = true
+	page.Selectable = false
+
+	page.ScrollingEnabled = true
+	page.ScrollingDirection = Enum.ScrollingDirection.Y
+
+	page.ScrollBarThickness = 3
+	page.ScrollBarImageColor3 = COLORS.Pink
+	page.ScrollBarImageTransparency = 0.25
+
+	page.CanvasSize = UDim2.new(0, 0, 0, 0)
+	page.AutomaticCanvasSize = Enum.AutomaticSize.Y
+
+	page.ElasticBehavior = Enum.ElasticBehavior.WhenScrollable
+
 	page.Parent = PageContainer
 
 	Pages[name] = page
@@ -502,6 +519,9 @@ local function showPage(pageName)
 
 	CurrentPage = newPage
 	newPage.Visible = true
+
+	-- RESET SCROLL POSITION WHEN OPENING A PAGE
+	newPage.CanvasPosition = Vector2.new(0, 0)
 
 	if not Settings.UIAnimations then
 		newPage.Position = UDim2.fromScale(0, 0)
