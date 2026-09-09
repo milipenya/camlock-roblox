@@ -7,6 +7,9 @@ local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local Stats = game:GetService("Stats")
+local CollectionService = game:GetService("CollectionService")
+local LogService = game:GetService("LogService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
@@ -141,6 +144,20 @@ local FPSFrames = 0
 local NPCs = {}
 
 local Connections = {}
+
+local DebugToolWindow = nil
+local DebugToolContent = nil
+local DebugToolTitle = nil
+local DebugToolSubtitle = nil
+
+local DebugConsoleMessages = {}
+local DebugConsoleConnection = nil
+
+local SelectedDebugPlayer = LocalPlayer
+local SelectedDebugObject = nil
+
+local RemoteList = {}
+local SelectedRemoteIndex = 1
 
 --==================================================
 -- SCREEN GUI
@@ -1765,6 +1782,1525 @@ DebugInfoPadding.PaddingTop = UDim.new(0, 9)
 DebugInfoPadding.Parent = DebugInfo
 
 --==================================================
+-- DEBUG TOOLS WINDOW
+--==================================================
+
+local function createDebugToolButton(
+	parent,
+	y,
+	title,
+	description,
+	callback
+)
+	local button = Instance.new("TextButton")
+	button.Size = UDim2.new(1, -16, 0, 50)
+	button.Position = UDim2.fromOffset(8, y)
+	button.BackgroundColor3 = COLORS.Card
+	button.BorderSizePixel = 0
+	button.Text = ""
+	button.AutoButtonColor = false
+	button.Active = true
+	button.Selectable = true
+	button.ZIndex = 42
+	button.Parent = parent
+
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 9)
+	corner.Parent = button
+
+	local titleLabel = Instance.new("TextLabel")
+	titleLabel.BackgroundTransparency = 1
+	titleLabel.Position = UDim2.fromOffset(11, 6)
+	titleLabel.Size = UDim2.new(1, -25, 0, 18)
+	titleLabel.Text = title
+	titleLabel.TextColor3 = COLORS.White
+	titleLabel.TextSize = 9
+	titleLabel.Font = Enum.Font.GothamBold
+	titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+	titleLabel.ZIndex = 43
+	titleLabel.Parent = button
+
+	local descLabel = Instance.new("TextLabel")
+	descLabel.BackgroundTransparency = 1
+	descLabel.Position = UDim2.fromOffset(11, 25)
+	descLabel.Size = UDim2.new(1, -25, 0, 16)
+	descLabel.Text = description
+	descLabel.TextColor3 = COLORS.Gray
+	descLabel.TextSize = 7
+	descLabel.Font = Enum.Font.Gotham
+	descLabel.TextXAlignment = Enum.TextXAlignment.Left
+	descLabel.ZIndex = 43
+	descLabel.Parent = button
+
+	styleButton(button)
+
+	button.Activated:Connect(callback)
+
+	return button
+end
+
+local function createDebugToolWindow()
+	if DebugToolWindow and DebugToolWindow.Parent then
+		return
+	end
+
+	DebugToolWindow = Instance.new("Frame")
+	DebugToolWindow.Name = "DebugToolWindow"
+	DebugToolWindow.AnchorPoint = Vector2.new(0.5, 0.5)
+	DebugToolWindow.Position = UDim2.fromScale(0.5, 0.5)
+	DebugToolWindow.Size = UDim2.new(0.88, 0, 0.78, 0)
+	DebugToolWindow.BackgroundColor3 = COLORS.Background
+	DebugToolWindow.BorderSizePixel = 0
+	DebugToolWindow.ZIndex = 40
+	DebugToolWindow.Visible = false
+	DebugToolWindow.Parent = ScreenGui
+
+	local sizeConstraint = Instance.new("UISizeConstraint")
+	sizeConstraint.MinSize = Vector2.new(290, 300)
+	sizeConstraint.MaxSize = Vector2.new(560, 430)
+	sizeConstraint.Parent = DebugToolWindow
+
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 14)
+	corner.Parent = DebugToolWindow
+
+	local stroke = Instance.new("UIStroke")
+	stroke.Color = COLORS.Pink
+	stroke.Thickness = 1.5
+	stroke.Transparency = 0.15
+	stroke.Parent = DebugToolWindow
+
+	local header = Instance.new("Frame")
+	header.Size = UDim2.new(1, 0, 0, 54)
+	header.BackgroundColor3 = COLORS.Panel
+	header.BorderSizePixel = 0
+	header.Active = true
+	header.ZIndex = 41
+	header.Parent = DebugToolWindow
+
+	local headerCorner = Instance.new("UICorner")
+	headerCorner.CornerRadius = UDim.new(0, 14)
+	headerCorner.Parent = header
+
+	DebugToolTitle = Instance.new("TextLabel")
+	DebugToolTitle.BackgroundTransparency = 1
+	DebugToolTitle.Position = UDim2.fromOffset(14, 7)
+	DebugToolTitle.Size = UDim2.new(1, -105, 0, 21)
+	DebugToolTitle.Text = "DEBUG TOOL"
+	DebugToolTitle.TextColor3 = COLORS.White
+	DebugToolTitle.TextSize = 14
+	DebugToolTitle.Font = Enum.Font.GothamBold
+	DebugToolTitle.TextXAlignment = Enum.TextXAlignment.Left
+	DebugToolTitle.ZIndex = 43
+	DebugToolTitle.Parent = header
+
+	DebugToolSubtitle = Instance.new("TextLabel")
+	DebugToolSubtitle.BackgroundTransparency = 1
+	DebugToolSubtitle.Position = UDim2.fromOffset(15, 29)
+	DebugToolSubtitle.Size = UDim2.new(1, -105, 0, 15)
+	DebugToolSubtitle.Text = "Inspector"
+	DebugToolSubtitle.TextColor3 = COLORS.Pink
+	DebugToolSubtitle.TextSize = 7
+	DebugToolSubtitle.Font = Enum.Font.GothamBold
+	DebugToolSubtitle.TextXAlignment = Enum.TextXAlignment.Left
+	DebugToolSubtitle.ZIndex = 43
+	DebugToolSubtitle.Parent = header
+
+	local close = Instance.new("TextButton")
+	close.Size = UDim2.fromOffset(31, 31)
+	close.Position = UDim2.new(1, -40, 0, 11)
+	close.BackgroundColor3 = COLORS.Card
+	close.BorderSizePixel = 0
+	close.Text = "×"
+	close.TextColor3 = COLORS.Pink
+	close.TextSize = 20
+	close.Font = Enum.Font.GothamBold
+	close.AutoButtonColor = false
+	close.Active = true
+	close.Selectable = true
+	close.ZIndex = 44
+	close.Parent = header
+
+	local closeCorner = Instance.new("UICorner")
+	closeCorner.CornerRadius = UDim.new(0, 9)
+	closeCorner.Parent = close
+
+	close.Activated:Connect(function()
+		DebugToolWindow.Visible = false
+	end)
+
+	DebugToolContent = Instance.new("ScrollingFrame")
+	DebugToolContent.Name = "Content"
+	DebugToolContent.Position = UDim2.fromOffset(8, 63)
+	DebugToolContent.Size = UDim2.new(1, -16, 1, -71)
+	DebugToolContent.BackgroundTransparency = 1
+	DebugToolContent.BorderSizePixel = 0
+	DebugToolContent.ScrollBarThickness = 3
+	DebugToolContent.ScrollBarImageColor3 = COLORS.Pink
+	DebugToolContent.ScrollBarImageTransparency = 0.25
+	DebugToolContent.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	DebugToolContent.CanvasSize = UDim2.new(0, 0, 0, 0)
+	DebugToolContent.ScrollingDirection = Enum.ScrollingDirection.Y
+	DebugToolContent.Active = true
+	DebugToolContent.ZIndex = 41
+	DebugToolContent.Parent = DebugToolWindow
+end
+
+createDebugToolWindow()
+
+local function clearDebugToolContent()
+	for _, child in ipairs(DebugToolContent:GetChildren()) do
+		child:Destroy()
+	end
+
+	DebugToolContent.CanvasPosition = Vector2.new(0, 0)
+end
+
+local function openDebugTool(title, subtitle)
+	createDebugToolWindow()
+
+	DebugToolTitle.Text = title
+	DebugToolSubtitle.Text = subtitle
+
+	clearDebugToolContent()
+
+	DebugToolWindow.Visible = true
+	DebugToolWindow.Position = UDim2.fromScale(0.5, 0.52)
+
+	if Settings.UIAnimations then
+		TweenService:Create(
+			DebugToolWindow,
+			TweenInfo.new(
+				0.18,
+				Enum.EasingStyle.Quart,
+				Enum.EasingDirection.Out
+			),
+			{
+				Position = UDim2.fromScale(0.5, 0.5)
+			}
+		):Play()
+	else
+		DebugToolWindow.Position = UDim2.fromScale(0.5, 0.5)
+	end
+end
+
+local function createToolSection(parent, y, title)
+	local label = Instance.new("TextLabel")
+	label.BackgroundTransparency = 1
+	label.Position = UDim2.fromOffset(11, y)
+	label.Size = UDim2.new(1, -22, 0, 18)
+	label.Text = title
+	label.TextColor3 = COLORS.Pink
+	label.TextSize = 8
+	label.Font = Enum.Font.GothamBold
+	label.TextXAlignment = Enum.TextXAlignment.Left
+	label.ZIndex = 43
+	label.Parent = parent
+
+	return label
+end
+
+local function createToolValue(parent, y, title, value, height)
+	local frame = Instance.new("Frame")
+	frame.Size = UDim2.new(1, -16, 0, height or 36)
+	frame.Position = UDim2.fromOffset(8, y)
+	frame.BackgroundColor3 = COLORS.Panel2
+	frame.BorderSizePixel = 0
+	frame.ZIndex = 42
+	frame.Parent = parent
+
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 8)
+	corner.Parent = frame
+
+	local titleLabel = Instance.new("TextLabel")
+	titleLabel.BackgroundTransparency = 1
+	titleLabel.Position = UDim2.fromOffset(10, 5)
+	titleLabel.Size = UDim2.new(0.32, 0, 1, -10)
+	titleLabel.Text = title
+	titleLabel.TextColor3 = COLORS.Gray
+	titleLabel.TextSize = 7
+	titleLabel.Font = Enum.Font.GothamBold
+	titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+	titleLabel.ZIndex = 43
+	titleLabel.Parent = frame
+
+	local valueLabel = Instance.new("TextLabel")
+	valueLabel.BackgroundTransparency = 1
+	valueLabel.Position = UDim2.new(0.32, 6, 0, 5)
+	valueLabel.Size = UDim2.new(0.68, -16, 1, -10)
+	valueLabel.Text = tostring(value)
+	valueLabel.TextColor3 = COLORS.White
+	valueLabel.TextSize = 7.5
+	valueLabel.Font = Enum.Font.Code
+	valueLabel.TextXAlignment = Enum.TextXAlignment.Right
+	valueLabel.TextYAlignment = Enum.TextYAlignment.Center
+	valueLabel.TextWrapped = true
+	valueLabel.ZIndex = 43
+	valueLabel.Parent = frame
+
+	return frame
+end
+
+local function createToolText(parent, y, text, height)
+	local label = Instance.new("TextLabel")
+	label.Size = UDim2.new(1, -16, 0, height or 45)
+	label.Position = UDim2.fromOffset(8, y)
+	label.BackgroundColor3 = COLORS.Panel2
+	label.BorderSizePixel = 0
+	label.Text = text
+	label.TextColor3 = COLORS.Gray
+	label.TextSize = 7.5
+	label.Font = Enum.Font.Code
+	label.TextXAlignment = Enum.TextXAlignment.Left
+	label.TextYAlignment = Enum.TextYAlignment.Top
+	label.TextWrapped = true
+	label.ZIndex = 42
+	label.Parent = parent
+
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 8)
+	corner.Parent = label
+
+	local padding = Instance.new("UIPadding")
+	padding.PaddingLeft = UDim.new(0, 10)
+	padding.PaddingRight = UDim.new(0, 10)
+	padding.PaddingTop = UDim.new(0, 8)
+	padding.PaddingBottom = UDim.new(0, 8)
+	padding.Parent = label
+
+	return label
+end
+
+local function createToolAction(parent, y, text, callback)
+	local button = Instance.new("TextButton")
+	button.Size = UDim2.new(1, -16, 0, 38)
+	button.Position = UDim2.fromOffset(8, y)
+	button.BackgroundColor3 = COLORS.Card
+	button.BorderSizePixel = 0
+	button.Text = text
+	button.TextColor3 = COLORS.White
+	button.TextSize = 8
+	button.Font = Enum.Font.GothamBold
+	button.AutoButtonColor = false
+	button.Active = true
+	button.Selectable = true
+	button.ZIndex = 42
+	button.Parent = parent
+
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 8)
+	corner.Parent = button
+
+	styleButton(button)
+
+	button.Activated:Connect(callback)
+
+	return button
+end
+
+--==================================================
+-- DEBUG TARGET HELPERS
+--==================================================
+
+local function getDebugPlayerList()
+	local list = {}
+
+	table.insert(list, LocalPlayer)
+
+	for _, player in ipairs(Players:GetPlayers()) do
+		if player ~= LocalPlayer then
+			table.insert(list, player)
+		end
+	end
+
+	return list
+end
+
+local function getDebugPlayer()
+	if SelectedDebugPlayer and SelectedDebugPlayer.Parent then
+		return SelectedDebugPlayer
+	end
+
+	return LocalPlayer
+end
+
+local function cycleDebugPlayer()
+	local list = getDebugPlayerList()
+
+	if #list == 0 then
+		SelectedDebugPlayer = LocalPlayer
+		return
+	end
+
+	local currentIndex = 1
+
+	for index, player in ipairs(list) do
+		if player == SelectedDebugPlayer then
+			currentIndex = index
+			break
+		end
+	end
+
+	currentIndex += 1
+
+	if currentIndex > #list then
+		currentIndex = 1
+	end
+
+	SelectedDebugPlayer = list[currentIndex]
+end
+
+local function selectAimbotTarget()
+	if CurrentTarget and CurrentTarget.Parent then
+		SelectedDebugPlayer = CurrentTarget
+		return
+	end
+
+	SelectedDebugPlayer = LocalPlayer
+end
+
+local function getPlayerCharacter(player)
+	if not player then
+		return nil
+	end
+
+	return player.Character
+end
+
+local function getCharacterDescription(character)
+	if not character then
+		return "No character"
+	end
+
+	local humanoid = getHumanoid(character)
+	local root = getRoot(character)
+
+	local lines = {}
+
+	table.insert(lines, "MODEL: " .. character.Name)
+	table.insert(lines, "CLASS: " .. character.ClassName)
+	table.insert(lines, "ARCHIVABLE: " .. tostring(character.Archivable))
+	table.insert(lines, "CHILDREN: " .. tostring(#character:GetChildren()))
+
+	if humanoid then
+		table.insert(lines, "HEALTH: " .. string.format("%.1f", humanoid.Health))
+		table.insert(lines, "MAX HEALTH: " .. string.format("%.1f", humanoid.MaxHealth))
+		table.insert(lines, "WALKSPEED: " .. string.format("%.1f", humanoid.WalkSpeed))
+		table.insert(lines, "JUMP POWER: " .. string.format("%.1f", humanoid.JumpPower))
+		table.insert(lines, "STATE: " .. tostring(humanoid:GetState()))
+	end
+
+	if root then
+		table.insert(lines, "POSITION: " .. tostring(root.Position))
+		table.insert(lines, "VELOCITY: " .. tostring(root.AssemblyLinearVelocity))
+	end
+
+	local parts = 0
+	local accessories = 0
+	local tools = 0
+
+	for _, object in ipairs(character:GetDescendants()) do
+		if object:IsA("BasePart") then
+			parts += 1
+		elseif object:IsA("Accessory") then
+			accessories += 1
+		elseif object:IsA("Tool") then
+			tools += 1
+		end
+	end
+
+	table.insert(lines, "BASEPARTS: " .. tostring(parts))
+	table.insert(lines, "ACCESSORIES: " .. tostring(accessories))
+	table.insert(lines, "TOOLS: " .. tostring(tools))
+
+	return table.concat(lines, "\n")
+end
+
+--==================================================
+-- CHARACTER INSPECTOR
+--==================================================
+
+local function showCharacterInspector()
+	openDebugTool(
+		"CHARACTER INSPECTOR",
+		"Character and humanoid diagnostics"
+	)
+
+	local content = DebugToolContent
+	local player = getDebugPlayer()
+	local character = getPlayerCharacter(player)
+
+	createToolSection(content, 8, "SELECTED PLAYER")
+
+	createToolValue(
+		content,
+		29,
+		"PLAYER",
+		player and player.Name or "None",
+		36
+	)
+
+	createToolAction(
+		content,
+		73,
+		"NEXT PLAYER",
+		function()
+			cycleDebugPlayer()
+			showCharacterInspector()
+		end
+	)
+
+	createToolAction(
+		content,
+		117,
+		"USE CURRENT AIM TARGET",
+		function()
+			selectAimbotTarget()
+			showCharacterInspector()
+		end
+	)
+
+	createToolSection(content, 167, "CHARACTER DATA")
+
+	createToolText(
+		content,
+		188,
+		getCharacterDescription(character),
+		190
+	)
+end
+
+--==================================================
+-- OBJECT INSPECTOR
+--==================================================
+
+local function getMouseRayObject()
+	Camera = workspace.CurrentCamera
+
+	if not Camera then
+		return nil
+	end
+
+	local mousePosition = UserInputService:GetMouseLocation()
+
+	local ray = Camera:ViewportPointToRay(
+		mousePosition.X,
+		mousePosition.Y
+	)
+
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	params.FilterDescendantsInstances = {
+		LocalPlayer.Character
+	}
+
+	local result = workspace:Raycast(
+		ray.Origin,
+		ray.Direction * 2000,
+		params
+	)
+
+	if result then
+		return result.Instance
+	end
+
+	return nil
+end
+
+local function getObjectPath(object)
+	if not object then
+		return "None"
+	end
+
+	local parts = {}
+	local current = object
+
+	while current and current ~= game do
+		table.insert(parts, 1, current.Name)
+		current = current.Parent
+	end
+
+	return table.concat(parts, ".")
+end
+
+local function getObjectInspectorText(object)
+	if not object then
+		return "No object selected."
+	end
+
+	local lines = {}
+
+	table.insert(lines, "NAME: " .. object.Name)
+	table.insert(lines, "CLASS: " .. object.ClassName)
+	table.insert(lines, "PATH: " .. getObjectPath(object))
+	table.insert(lines, "PARENT: " .. (object.Parent and object.Parent.Name or "None"))
+	table.insert(lines, "ARCHIVABLE: " .. tostring(object.Archivable))
+	table.insert(lines, "CHILDREN: " .. tostring(#object:GetChildren()))
+
+	if object:IsA("BasePart") then
+		table.insert(lines, "POSITION: " .. tostring(object.Position))
+		table.insert(lines, "SIZE: " .. tostring(object.Size))
+		table.insert(lines, "ANCHOR: " .. tostring(object.Anchored))
+		table.insert(lines, "CAN COLLIDE: " .. tostring(object.CanCollide))
+		table.insert(lines, "TRANSPARENCY: " .. tostring(object.Transparency))
+		table.insert(lines, "MATERIAL: " .. tostring(object.Material))
+	elseif object:IsA("ValueBase") then
+		table.insert(lines, "VALUE: " .. tostring(object.Value))
+	elseif object:IsA("Humanoid") then
+		table.insert(lines, "HEALTH: " .. tostring(object.Health))
+		table.insert(lines, "MAX HEALTH: " .. tostring(object.MaxHealth))
+	elseif object:IsA("Tool") then
+		table.insert(lines, "EQUIPPED: " .. tostring(object.Parent == LocalPlayer.Character))
+	elseif object:IsA("RemoteEvent") then
+		table.insert(lines, "REMOTE TYPE: RemoteEvent")
+	elseif object:IsA("RemoteFunction") then
+		table.insert(lines, "REMOTE TYPE: RemoteFunction")
+	end
+
+	local attributes = object:GetAttributes()
+	local attributeCount = 0
+
+	for _ in pairs(attributes) do
+		attributeCount += 1
+	end
+
+	table.insert(lines, "ATTRIBUTES: " .. tostring(attributeCount))
+
+	return table.concat(lines, "\n")
+end
+
+local function showObjectInspector()
+	openDebugTool(
+		"OBJECT INSPECTOR",
+		"Inspect object under cursor"
+	)
+
+	local content = DebugToolContent
+
+	createToolAction(
+		content,
+		8,
+		"INSPECT OBJECT UNDER CURSOR",
+		function()
+			SelectedDebugObject = getMouseRayObject()
+			showObjectInspector()
+		end
+	)
+
+	if not SelectedDebugObject or not SelectedDebugObject.Parent then
+		SelectedDebugObject = nil
+	end
+
+	createToolSection(content, 57, "OBJECT DATA")
+
+	createToolText(
+		content,
+		78,
+		getObjectInspectorText(SelectedDebugObject),
+		230
+	)
+end
+
+--==================================================
+-- ATTRIBUTE VIEWER
+--==================================================
+
+local function getAttributesText(instance)
+	if not instance then
+		return "No instance selected."
+	end
+
+	local attributes = instance:GetAttributes()
+	local keys = {}
+
+	for key in pairs(attributes) do
+		table.insert(keys, key)
+	end
+
+	table.sort(keys)
+
+	if #keys == 0 then
+		return "No attributes found."
+	end
+
+	local lines = {}
+
+	for _, key in ipairs(keys) do
+		table.insert(
+			lines,
+			key .. " = " .. tostring(attributes[key])
+		)
+	end
+
+	return table.concat(lines, "\n")
+end
+
+local function showAttributeViewer()
+	openDebugTool(
+		"ATTRIBUTE VIEWER",
+		"Inspect instance attributes"
+	)
+
+	local content = DebugToolContent
+	local player = getDebugPlayer()
+	local character = getPlayerCharacter(player)
+
+	createToolSection(content, 8, "SOURCE")
+
+	createToolValue(
+		content,
+		29,
+		"PLAYER",
+		player and player.Name or "None",
+		36
+	)
+
+	createToolAction(
+		content,
+		73,
+		"NEXT PLAYER",
+		function()
+			cycleDebugPlayer()
+			showAttributeViewer()
+		end
+	)
+
+	createToolAction(
+		content,
+		117,
+		"USE CURRENT AIM TARGET",
+		function()
+			selectAimbotTarget()
+			showAttributeViewer()
+		end
+	)
+
+	createToolSection(content, 167, "CHARACTER ATTRIBUTES")
+
+	createToolText(
+		content,
+		188,
+		getAttributesText(character),
+		180
+	)
+end
+
+--==================================================
+-- TAG VIEWER
+--==================================================
+
+local function getTagsText(instance)
+	if not instance then
+		return "No instance selected."
+	end
+
+	local tags = CollectionService:GetTags(instance)
+
+	if #tags == 0 then
+		return "No CollectionService tags."
+	end
+
+	table.sort(tags)
+
+	local lines = {}
+
+	for _, tag in ipairs(tags) do
+		table.insert(lines, "• " .. tag)
+	end
+
+	return table.concat(lines, "\n")
+end
+
+local function showTagViewer()
+	openDebugTool(
+		"TAG VIEWER",
+		"Inspect CollectionService tags"
+	)
+
+	local content = DebugToolContent
+	local player = getDebugPlayer()
+	local character = getPlayerCharacter(player)
+
+	createToolSection(content, 8, "SOURCE")
+
+	createToolValue(
+		content,
+		29,
+		"PLAYER",
+		player and player.Name or "None",
+		36
+	)
+
+	createToolAction(
+		content,
+		73,
+		"NEXT PLAYER",
+		function()
+			cycleDebugPlayer()
+			showTagViewer()
+		end
+	)
+
+	createToolAction(
+		content,
+		117,
+		"USE CURRENT AIM TARGET",
+		function()
+			selectAimbotTarget()
+			showTagViewer()
+		end
+	)
+
+	createToolSection(content, 167, "TAGS")
+
+	createToolText(
+		content,
+		188,
+		getTagsText(character),
+		150
+	)
+end
+
+--==================================================
+-- TOOL INSPECTOR
+--==================================================
+
+local function getToolText(player)
+	if not player then
+		return "No player selected."
+	end
+
+	local lines = {}
+
+	local backpack = player:FindFirstChildOfClass("Backpack")
+	local character = player.Character
+
+	table.insert(lines, "PLAYER: " .. player.Name)
+	table.insert(lines, "")
+
+	local found = {}
+
+	if character then
+		for _, object in ipairs(character:GetChildren()) do
+			if object:IsA("Tool") then
+				table.insert(found, object.Name .. " [EQUIPPED]")
+			end
+		end
+	end
+
+	if backpack then
+		for _, object in ipairs(backpack:GetChildren()) do
+			if object:IsA("Tool") then
+				table.insert(found, object.Name .. " [BACKPACK]")
+			end
+		end
+	end
+
+	if #found == 0 then
+		table.insert(lines, "No tools found.")
+	else
+		for _, name in ipairs(found) do
+			table.insert(lines, "• " .. name)
+		end
+	end
+
+	return table.concat(lines, "\n")
+end
+
+local function showToolInspector()
+	openDebugTool(
+		"TOOL INSPECTOR",
+		"Inspect player tools"
+	)
+
+	local content = DebugToolContent
+	local player = getDebugPlayer()
+
+	createToolSection(content, 8, "SELECTED PLAYER")
+
+	createToolValue(
+		content,
+		29,
+		"PLAYER",
+		player and player.Name or "None",
+		36
+	)
+
+	createToolAction(
+		content,
+		73,
+		"NEXT PLAYER",
+		function()
+			cycleDebugPlayer()
+			showToolInspector()
+		end
+	)
+
+	createToolAction(
+		content,
+		117,
+		"USE CURRENT AIM TARGET",
+		function()
+			selectAimbotTarget()
+			showToolInspector()
+		end
+	)
+
+	createToolSection(content, 167, "TOOLS")
+
+	createToolText(
+		content,
+		188,
+		getToolText(player),
+		160
+	)
+end
+
+--==================================================
+-- REMOTE TEST PANEL
+--==================================================
+
+local function rebuildRemoteList()
+	table.clear(RemoteList)
+
+	for _, object in ipairs(ReplicatedStorage:GetDescendants()) do
+		if object:IsA("RemoteEvent")
+			or object:IsA("RemoteFunction") then
+
+			table.insert(RemoteList, object)
+		end
+	end
+
+	table.sort(
+		RemoteList,
+		function(a, b)
+			return getObjectPath(a) < getObjectPath(b)
+		end
+	)
+
+	if #RemoteList == 0 then
+		SelectedRemoteIndex = 1
+	elseif SelectedRemoteIndex > #RemoteList then
+		SelectedRemoteIndex = #RemoteList
+	end
+end
+
+local function getSelectedRemote()
+	return RemoteList[SelectedRemoteIndex]
+end
+
+local function showRemoteTestPanel()
+	rebuildRemoteList()
+
+	openDebugTool(
+		"REMOTE TEST PANEL",
+		"Inspect ReplicatedStorage remotes"
+	)
+
+	local content = DebugToolContent
+	local remote = getSelectedRemote()
+
+	createToolAction(
+		content,
+		8,
+		"REFRESH REMOTE LIST",
+		function()
+			rebuildRemoteList()
+			showRemoteTestPanel()
+		end
+	)
+
+	createToolSection(content, 57, "SELECTED REMOTE")
+
+	createToolValue(
+		content,
+		78,
+		"COUNT",
+		#RemoteList,
+		36
+	)
+
+	createToolValue(
+		content,
+		122,
+		"REMOTE",
+		remote and remote.Name or "None",
+		36
+	)
+
+	createToolValue(
+		content,
+		166,
+		"TYPE",
+		remote and remote.ClassName or "None",
+		36
+	)
+
+	createToolText(
+		content,
+		210,
+		remote and getObjectPath(remote) or "No RemoteEvent or RemoteFunction found in ReplicatedStorage.",
+		55
+	)
+
+	createToolAction(
+		content,
+		275,
+		"NEXT REMOTE",
+		function()
+			if #RemoteList > 0 then
+				SelectedRemoteIndex += 1
+
+				if SelectedRemoteIndex > #RemoteList then
+					SelectedRemoteIndex = 1
+				end
+			end
+
+			showRemoteTestPanel()
+		end
+	)
+
+	if remote and remote:IsA("RemoteEvent") then
+		createToolAction(
+			content,
+			319,
+			"FIRE EVENT — NO ARGS",
+			function()
+				local success, errorMessage = pcall(function()
+					remote:FireServer()
+				end)
+
+				table.insert(
+					DebugConsoleMessages,
+					1,
+					"[REMOTE EVENT] "
+						.. remote.Name
+						.. " -> "
+						.. (success and "FIRED" or tostring(errorMessage))
+				)
+
+				while #DebugConsoleMessages > 80 do
+					table.remove(DebugConsoleMessages)
+				end
+			end
+		)
+	elseif remote and remote:IsA("RemoteFunction") then
+		createToolAction(
+			content,
+			319,
+			"INVOKE FUNCTION — NO ARGS",
+			function()
+				task.spawn(function()
+					local success, result = pcall(function()
+						return remote:InvokeServer()
+					end)
+
+					local resultText = success
+						and tostring(result)
+						or tostring(result)
+
+					table.insert(
+						DebugConsoleMessages,
+						1,
+						"[REMOTE FUNCTION] "
+							.. remote.Name
+							.. " -> "
+							.. resultText
+					)
+
+					while #DebugConsoleMessages > 80 do
+						table.remove(DebugConsoleMessages)
+					end
+				end)
+			end
+		)
+	end
+end
+
+--==================================================
+-- PERFORMANCE MONITOR
+--==================================================
+
+local function getPing()
+	local success, value = pcall(function()
+		local network = Stats:FindFirstChild("Network")
+
+		if not network then
+			return 0
+		end
+
+		local serverStats = network:FindFirstChild("ServerStatsItem")
+
+		if not serverStats then
+			return 0
+		end
+
+		local ping = serverStats:FindFirstChild("Data Ping")
+
+		if ping then
+			return ping:GetValue()
+		end
+
+		return 0
+	end)
+
+	if success and value then
+		return value
+	end
+
+	return 0
+end
+
+local function getInstanceCount()
+	local count = 0
+
+	for _, object in ipairs(game:GetDescendants()) do
+		count += 1
+	end
+
+	return count
+end
+
+local function showPerformanceMonitor()
+	openDebugTool(
+		"PERFORMANCE MONITOR",
+		"Live client performance"
+	)
+
+	local content = DebugToolContent
+
+	createToolSection(content, 8, "LIVE METRICS")
+
+	local fpsValue = createToolValue(
+		content,
+		29,
+		"FPS",
+		math.floor(LastFPS),
+		38
+	)
+
+	local memoryValue = createToolValue(
+		content,
+		73,
+		"MEMORY",
+		string.format("%.0f MB", getMemoryUsage()),
+		38
+	)
+
+	local pingValue = createToolValue(
+		content,
+		117,
+		"PING",
+		string.format("%.0f ms", getPing()),
+		38
+	)
+
+	local playerValue = createToolValue(
+		content,
+		161,
+		"PLAYERS",
+		#Players:GetPlayers(),
+		38
+	)
+
+	local npcValue = createToolValue(
+		content,
+		205,
+		"NPC CACHE",
+		(function()
+			local count = 0
+
+			for npc in pairs(NPCs) do
+				if npc.Parent and isNPC(npc) then
+					count += 1
+				end
+			end
+
+			return count
+		end)(),
+		38
+	)
+
+	local instanceValue = createToolValue(
+		content,
+		249,
+		"INSTANCES",
+		getInstanceCount(),
+		38
+	)
+
+	createToolAction(
+		content,
+		295,
+		"REFRESH",
+		function()
+			showPerformanceMonitor()
+		end
+	)
+
+	task.spawn(function()
+		while DebugToolWindow
+			and DebugToolWindow.Visible
+			and DebugToolTitle
+			and DebugToolTitle.Text == "PERFORMANCE MONITOR" do
+
+			task.wait(0.5)
+
+			if not DebugToolWindow.Visible then
+				break
+			end
+
+			if fpsValue and fpsValue.Parent then
+				local valueLabel = fpsValue:FindFirstChildWhichIsA("TextLabel")
+
+				if valueLabel then
+					valueLabel.Text = tostring(math.floor(LastFPS))
+				end
+			end
+
+			if memoryValue and memoryValue.Parent then
+				local labels = memoryValue:GetChildren()
+
+				for _, object in ipairs(labels) do
+					if object:IsA("TextLabel")
+						and object.Text ~= "MEMORY" then
+
+						object.Text =
+							string.format(
+								"%.0f MB",
+								getMemoryUsage()
+							)
+					end
+				end
+			end
+
+			if pingValue and pingValue.Parent then
+				for _, object in ipairs(pingValue:GetChildren()) do
+					if object:IsA("TextLabel")
+						and object.Text ~= "PING" then
+
+						object.Text =
+							string.format(
+								"%.0f ms",
+								getPing()
+							)
+					end
+				end
+			end
+
+			if playerValue and playerValue.Parent then
+				for _, object in ipairs(playerValue:GetChildren()) do
+					if object:IsA("TextLabel")
+						and object.Text ~= "PLAYERS" then
+
+						object.Text =
+							tostring(#Players:GetPlayers())
+					end
+				end
+			end
+		end
+	end)
+end
+
+--==================================================
+-- DEBUG CONSOLE
+--==================================================
+
+local function addConsoleMessage(message)
+	table.insert(
+		DebugConsoleMessages,
+		1,
+		message
+	)
+
+	while #DebugConsoleMessages > 100 do
+		table.remove(DebugConsoleMessages)
+	end
+end
+
+DebugConsoleConnection = LogService.MessageOut:Connect(
+	function(message, messageType)
+		local typeName = tostring(messageType)
+
+		addConsoleMessage(
+			"["
+				.. typeName
+				.. "] "
+				.. message
+		)
+	end
+)
+
+table.insert(
+	Connections,
+	DebugConsoleConnection
+)
+
+local function getConsoleText()
+	if #DebugConsoleMessages == 0 then
+		return "Debug console is empty."
+	end
+
+	return table.concat(
+		DebugConsoleMessages,
+		"\n"
+	)
+end
+
+local function showDebugConsole()
+	openDebugTool(
+		"DEBUG CONSOLE",
+		"Client output and runtime messages"
+	)
+
+	local content = DebugToolContent
+
+	createToolAction(
+		content,
+		8,
+		"CLEAR CONSOLE",
+		function()
+			table.clear(DebugConsoleMessages)
+			showDebugConsole()
+		end
+	)
+
+	createToolSection(content, 57, "OUTPUT")
+
+	createToolText(
+		content,
+		78,
+		getConsoleText(),
+		270
+	)
+end
+
+--==================================================
+-- PLAYER CLOTHING DEBUG
+--==================================================
+
+local function getClothingText(player)
+	if not player then
+		return "No player selected."
+	end
+
+	local character = player.Character
+
+	if not character then
+		return "Character is not loaded."
+	end
+
+	local lines = {}
+
+	table.insert(lines, "PLAYER: " .. player.Name)
+	table.insert(lines, "")
+
+	local shirt = character:FindFirstChildOfClass("Shirt")
+	local pants = character:FindFirstChildOfClass("Pants")
+	local graphic = character:FindFirstChildOfClass("ShirtGraphic")
+
+	table.insert(
+		lines,
+		"SHIRT: "
+			.. (
+				shirt
+				and tostring(shirt.ShirtTemplate)
+				or "None"
+			)
+	)
+
+	table.insert(
+		lines,
+		"PANTS: "
+			.. (
+				pants
+				and tostring(pants.PantsTemplate)
+				or "None"
+			)
+	)
+
+	table.insert(
+		lines,
+		"SHIRT GRAPHIC: "
+			.. (
+				graphic
+				and tostring(graphic.Graphic)
+				or "None"
+			)
+	)
+
+	table.insert(lines, "")
+	table.insert(lines, "ACCESSORIES:")
+
+	local accessories = {}
+
+	for _, object in ipairs(character:GetChildren()) do
+		if object:IsA("Accessory") then
+			local handle = object:FindFirstChild("Handle")
+
+			local accessoryType = "Unknown"
+
+			if handle then
+				local attachment = handle:FindFirstChildWhichIsA("Attachment")
+
+				if attachment then
+					accessoryType = attachment.Name
+				end
+			end
+
+			table.insert(
+				accessories,
+				object.Name
+					.. " ["
+					.. accessoryType
+					.. "]"
+			)
+		end
+	end
+
+	if #accessories == 0 then
+		table.insert(lines, "None")
+	else
+		for _, accessory in ipairs(accessories) do
+			table.insert(
+				lines,
+				"• " .. accessory
+			)
+		end
+	end
+
+	return table.concat(lines, "\n")
+end
+
+local function showPlayerClothingDebug()
+	openDebugTool(
+		"PLAYER CLOTHING DEBUG",
+		"Inspect player's current clothing"
+	)
+
+	local content = DebugToolContent
+	local player = getDebugPlayer()
+
+	createToolSection(content, 8, "SELECTED PLAYER")
+
+	createToolValue(
+		content,
+		29,
+		"PLAYER",
+		player and player.Name or "None",
+		36
+	)
+
+	createToolAction(
+		content,
+		73,
+		"NEXT PLAYER",
+		function()
+			cycleDebugPlayer()
+			showPlayerClothingDebug()
+		end
+	)
+
+	createToolAction(
+		content,
+		117,
+		"USE CURRENT AIM TARGET",
+		function()
+			selectAimbotTarget()
+			showPlayerClothingDebug()
+		end
+	)
+
+	createToolSection(content, 167, "CLOTHING")
+
+	createToolText(
+		content,
+		188,
+		getClothingText(player),
+		230
+	)
+end
+
+--==================================================
+-- DEBUG TOOLS MENU
+--==================================================
+
+createToolSection(DebugPage, 355, "DEBUG TOOLS")
+
+createDebugToolButton(
+	DebugPage,
+	377,
+	"CHARACTER INSPECTOR",
+	"Inspect humanoid, character parts and movement state",
+	showCharacterInspector
+)
+
+createDebugToolButton(
+	DebugPage,
+	433,
+	"OBJECT INSPECTOR",
+	"Inspect the object under the mouse or touch position",
+	showObjectInspector
+)
+
+createDebugToolButton(
+	DebugPage,
+	489,
+	"ATTRIBUTE VIEWER",
+	"View attributes attached to the selected character",
+	showAttributeViewer
+)
+
+createDebugToolButton(
+	DebugPage,
+	545,
+	"TAG VIEWER",
+	"View CollectionService tags on the selected character",
+	showTagViewer
+)
+
+createDebugToolButton(
+	DebugPage,
+	601,
+	"TOOL INSPECTOR",
+	"Inspect equipped and backpack tools",
+	showToolInspector
+)
+
+createDebugToolButton(
+	DebugPage,
+	657,
+	"REMOTE TEST PANEL",
+	"Inspect and test ReplicatedStorage remotes",
+	showRemoteTestPanel
+)
+
+createDebugToolButton(
+	DebugPage,
+	713,
+	"PERFORMANCE MONITOR",
+	"Live FPS, memory, ping and instance statistics",
+	showPerformanceMonitor
+)
+
+createDebugToolButton(
+	DebugPage,
+	769,
+	"DEBUG CONSOLE",
+	"View client runtime output and messages",
+	showDebugConsole
+)
+
+createDebugToolButton(
+	DebugPage,
+	825,
+	"PLAYER CLOTHING DEBUG",
+	"Inspect shirt, pants and accessories",
+	showPlayerClothingDebug
+)
+
+--==================================================
 -- MISC PAGE
 --==================================================
 
@@ -2396,6 +3932,10 @@ Players.PlayerRemoving:Connect(function(player)
 	if CurrentTarget == player then
 		CurrentTarget = nil
 	end
+
+	if SelectedDebugPlayer == player then
+		SelectedDebugPlayer = LocalPlayer
+	end
 end)
 
 LocalPlayer.CharacterAdded:Connect(function()
@@ -2458,6 +3998,10 @@ local function closePanel()
 	end
 
 	IsOpen = false
+
+	if DebugToolWindow then
+		DebugToolWindow.Visible = false
+	end
 
 	if not Settings.UIAnimations then
 		Main.Visible = false
@@ -2607,6 +4151,10 @@ showPage("Home")
 
 ScreenGui.Destroying:Connect(function()
 	RunService:UnbindFromRenderStep("CombatAdminAim")
+
+	if DebugConsoleConnection then
+		DebugConsoleConnection:Disconnect()
+	end
 
 	for _, connection in ipairs(Connections) do
 		if connection then
