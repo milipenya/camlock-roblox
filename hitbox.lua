@@ -10,6 +10,7 @@ local Stats = game:GetService("Stats")
 local CollectionService = game:GetService("CollectionService")
 local LogService = game:GetService("LogService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local MarketplaceService = game:GetService("MarketplaceService")
 
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
@@ -158,6 +159,24 @@ local SelectedDebugObject = nil
 
 local RemoteList = {}
 local SelectedRemoteIndex = 1
+
+local SelectedToolName = nil
+local ToolGiveRemote = nil
+
+--==================================================
+-- TOOL GIVE REMOTE
+--==================================================
+
+task.spawn(function()
+	local remote = ReplicatedStorage:WaitForChild(
+		"AdminToolGive",
+		10
+	)
+
+	if remote and remote:IsA("RemoteEvent") then
+		ToolGiveRemote = remote
+	end
+end)
 
 --==================================================
 -- SCREEN GUI
@@ -2566,25 +2585,24 @@ end
 -- TOOL INSPECTOR
 --==================================================
 
-local function getToolText(player)
+local function getPlayerTools(player)
+	local tools = {}
+
 	if not player then
-		return "No player selected."
+		return tools
 	end
 
-	local lines = {}
-
-	local backpack = player:FindFirstChildOfClass("Backpack")
 	local character = player.Character
-
-	table.insert(lines, "PLAYER: " .. player.Name)
-	table.insert(lines, "")
-
-	local found = {}
+	local backpack = player:FindFirstChildOfClass("Backpack")
 
 	if character then
 		for _, object in ipairs(character:GetChildren()) do
 			if object:IsA("Tool") then
-				table.insert(found, object.Name .. " [EQUIPPED]")
+				table.insert(tools, {
+					Name = object.Name,
+					Tool = object,
+					Location = "EQUIPPED",
+				})
 			end
 		end
 	end
@@ -2592,30 +2610,148 @@ local function getToolText(player)
 	if backpack then
 		for _, object in ipairs(backpack:GetChildren()) do
 			if object:IsA("Tool") then
-				table.insert(found, object.Name .. " [BACKPACK]")
+				table.insert(tools, {
+					Name = object.Name,
+					Tool = object,
+					Location = "BACKPACK",
+				})
 			end
 		end
 	end
 
-	if #found == 0 then
+	table.sort(
+		tools,
+		function(a, b)
+			return a.Name < b.Name
+		end
+	)
+
+	return tools
+end
+
+local function getToolText(player)
+	if not player then
+		return "No player selected."
+	end
+
+	local tools = getPlayerTools(player)
+
+	local lines = {}
+
+	table.insert(lines, "PLAYER: " .. player.Name)
+	table.insert(lines, "")
+
+	if #tools == 0 then
 		table.insert(lines, "No tools found.")
 	else
-		for _, name in ipairs(found) do
-			table.insert(lines, "• " .. name)
+		for index, entry in ipairs(tools) do
+			table.insert(
+				lines,
+				tostring(index)
+					.. ". "
+					.. entry.Name
+					.. " ["
+					.. entry.Location
+					.. "]"
+			)
 		end
 	end
 
 	return table.concat(lines, "\n")
 end
 
+local function getSelectedPlayerTool(player)
+	local tools = getPlayerTools(player)
+
+	if #tools == 0 then
+		SelectedToolName = nil
+		return nil
+	end
+
+	if not SelectedToolName then
+		SelectedToolName = tools[1].Name
+	end
+
+	for _, entry in ipairs(tools) do
+		if entry.Name == SelectedToolName then
+			return entry.Tool
+		end
+	end
+
+	SelectedToolName = tools[1].Name
+
+	return tools[1].Tool
+end
+
+local function cycleSelectedTool(player)
+	local tools = getPlayerTools(player)
+
+	if #tools == 0 then
+		SelectedToolName = nil
+		return
+	end
+
+	local currentIndex = 1
+
+	for index, entry in ipairs(tools) do
+		if entry.Name == SelectedToolName then
+			currentIndex = index
+			break
+		end
+	end
+
+	currentIndex += 1
+
+	if currentIndex > #tools then
+		currentIndex = 1
+	end
+
+	SelectedToolName = tools[currentIndex].Name
+end
+
+local function requestGiveSelectedTool()
+	local player = getDebugPlayer()
+	local tool = getSelectedPlayerTool(player)
+
+	if not player or not tool then
+		addConsoleMessage("[TOOL GIVE] No tool selected.")
+		return
+	end
+
+	if not ToolGiveRemote then
+		ToolGiveRemote =
+			ReplicatedStorage:FindFirstChild("AdminToolGive")
+	end
+
+	if not ToolGiveRemote or not ToolGiveRemote:IsA("RemoteEvent") then
+		addConsoleMessage(
+			"[TOOL GIVE] AdminToolGive RemoteEvent not found."
+		)
+		return
+	end
+
+	ToolGiveRemote:FireServer(
+		player,
+		tool.Name
+	)
+
+	addConsoleMessage(
+		"[TOOL GIVE] Requested: "
+			.. tool.Name
+			.. " from "
+			.. player.Name
+	)
+end
+
 local function showToolInspector()
 	openDebugTool(
 		"TOOL INSPECTOR",
-		"Inspect player tools"
+		"Inspect and give player tools"
 	)
 
 	local content = DebugToolContent
 	local player = getDebugPlayer()
+	local selectedTool = getSelectedPlayerTool(player)
 
 	createToolSection(content, 8, "SELECTED PLAYER")
 
@@ -2633,6 +2769,7 @@ local function showToolInspector()
 		"NEXT PLAYER",
 		function()
 			cycleDebugPlayer()
+			SelectedToolName = nil
 			showToolInspector()
 		end
 	)
@@ -2643,17 +2780,45 @@ local function showToolInspector()
 		"USE CURRENT AIM TARGET",
 		function()
 			selectAimbotTarget()
+			SelectedToolName = nil
 			showToolInspector()
 		end
 	)
 
-	createToolSection(content, 167, "TOOLS")
+	createToolSection(content, 167, "AVAILABLE TOOLS")
 
 	createToolText(
 		content,
 		188,
 		getToolText(player),
-		160
+		150
+	)
+
+	createToolValue(
+		content,
+		348,
+		"SELECTED",
+		selectedTool and selectedTool.Name or "None",
+		36
+	)
+
+	createToolAction(
+		content,
+		392,
+		"NEXT TOOL",
+		function()
+			cycleSelectedTool(player)
+			showToolInspector()
+		end
+	)
+
+	createToolAction(
+		content,
+		436,
+		"GIVE SELECTED TOOL",
+		function()
+			requestGiveSelectedTool()
+		end
 	)
 end
 
@@ -2771,18 +2936,16 @@ local function showRemoteTestPanel()
 					remote:FireServer()
 				end)
 
-				table.insert(
-					DebugConsoleMessages,
-					1,
+				addConsoleMessage(
 					"[REMOTE EVENT] "
 						.. remote.Name
 						.. " -> "
-						.. (success and "FIRED" or tostring(errorMessage))
+						.. (
+							success
+							and "FIRED"
+							or tostring(errorMessage)
+						)
 				)
-
-				while #DebugConsoleMessages > 80 do
-					table.remove(DebugConsoleMessages)
-				end
 			end
 		)
 	elseif remote and remote:IsA("RemoteFunction") then
@@ -2796,22 +2959,12 @@ local function showRemoteTestPanel()
 						return remote:InvokeServer()
 					end)
 
-					local resultText = success
-						and tostring(result)
-						or tostring(result)
-
-					table.insert(
-						DebugConsoleMessages,
-						1,
+					addConsoleMessage(
 						"[REMOTE FUNCTION] "
 							.. remote.Name
 							.. " -> "
-							.. resultText
+							.. tostring(result)
 					)
-
-					while #DebugConsoleMessages > 80 do
-						table.remove(DebugConsoleMessages)
-					end
 				end)
 			end
 		)
@@ -2860,6 +3013,18 @@ local function getInstanceCount()
 	end
 
 	return count
+end
+
+local function getMemoryUsage()
+	local success, value = pcall(function()
+		return Stats:GetTotalMemoryUsageMb()
+	end)
+
+	if success and value then
+		return value
+	end
+
+	return 0
 end
 
 local function showPerformanceMonitor()
@@ -2952,17 +3117,17 @@ local function showPerformanceMonitor()
 			end
 
 			if fpsValue and fpsValue.Parent then
-				local valueLabel = fpsValue:FindFirstChildWhichIsA("TextLabel")
+				local valueLabel =
+					fpsValue:FindFirstChildWhichIsA("TextLabel")
 
 				if valueLabel then
-					valueLabel.Text = tostring(math.floor(LastFPS))
+					valueLabel.Text =
+						tostring(math.floor(LastFPS))
 				end
 			end
 
 			if memoryValue and memoryValue.Parent then
-				local labels = memoryValue:GetChildren()
-
-				for _, object in ipairs(labels) do
+				for _, object in ipairs(memoryValue:GetChildren()) do
 					if object:IsA("TextLabel")
 						and object.Text ~= "MEMORY" then
 
@@ -2996,6 +3161,35 @@ local function showPerformanceMonitor()
 
 						object.Text =
 							tostring(#Players:GetPlayers())
+					end
+				end
+			end
+
+			if npcValue and npcValue.Parent then
+				for _, object in ipairs(npcValue:GetChildren()) do
+					if object:IsA("TextLabel")
+						and object.Text ~= "NPC CACHE" then
+
+						local count = 0
+
+						for npc in pairs(NPCs) do
+							if npc.Parent and isNPC(npc) then
+								count += 1
+							end
+						end
+
+						object.Text = tostring(count)
+					end
+				end
+			end
+
+			if instanceValue and instanceValue.Parent then
+				for _, object in ipairs(instanceValue:GetChildren()) do
+					if object:IsA("TextLabel")
+						and object.Text ~= "INSTANCES" then
+
+						object.Text =
+							tostring(getInstanceCount())
 					end
 				end
 			end
@@ -3080,6 +3274,41 @@ end
 -- PLAYER CLOTHING DEBUG
 --==================================================
 
+local function extractAssetId(value)
+	if not value then
+		return nil
+	end
+
+	local id = tostring(value):match("%d+")
+
+	if not id then
+		return nil
+	end
+
+	return tonumber(id)
+end
+
+local function getClothingAssetName(template)
+	local assetId = extractAssetId(template)
+
+	if not assetId then
+		return "Unknown"
+	end
+
+	local success, info = pcall(function()
+		return MarketplaceService:GetProductInfo(
+			assetId,
+			Enum.InfoType.Asset
+		)
+	end)
+
+	if success and info and info.Name then
+		return info.Name
+	end
+
+	return "Unknown"
+end
+
 local function getClothingText(player)
 	if not player then
 		return "No player selected."
@@ -3100,35 +3329,50 @@ local function getClothingText(player)
 	local pants = character:FindFirstChildOfClass("Pants")
 	local graphic = character:FindFirstChildOfClass("ShirtGraphic")
 
-	table.insert(
-		lines,
-		"SHIRT: "
-			.. (
-				shirt
-				and tostring(shirt.ShirtTemplate)
-				or "None"
-			)
-	)
+	if shirt then
+		local assetId = extractAssetId(shirt.ShirtTemplate)
 
-	table.insert(
-		lines,
-		"PANTS: "
-			.. (
-				pants
-				and tostring(pants.PantsTemplate)
-				or "None"
-			)
-	)
+		table.insert(
+			lines,
+			"SHIRT: "
+				.. getClothingAssetName(shirt.ShirtTemplate)
+				.. " ["
+				.. tostring(assetId or "N/A")
+				.. "]"
+		)
+	else
+		table.insert(lines, "SHIRT: None")
+	end
 
-	table.insert(
-		lines,
-		"SHIRT GRAPHIC: "
-			.. (
-				graphic
-				and tostring(graphic.Graphic)
-				or "None"
-			)
-	)
+	if pants then
+		local assetId = extractAssetId(pants.PantsTemplate)
+
+		table.insert(
+			lines,
+			"PANTS: "
+				.. getClothingAssetName(pants.PantsTemplate)
+				.. " ["
+				.. tostring(assetId or "N/A")
+				.. "]"
+		)
+	else
+		table.insert(lines, "PANTS: None")
+	end
+
+	if graphic then
+		local assetId = extractAssetId(graphic.Graphic)
+
+		table.insert(
+			lines,
+			"SHIRT GRAPHIC: "
+				.. getClothingAssetName(graphic.Graphic)
+				.. " ["
+				.. tostring(assetId or "N/A")
+				.. "]"
+		)
+	else
+		table.insert(lines, "SHIRT GRAPHIC: None")
+	end
 
 	table.insert(lines, "")
 	table.insert(lines, "ACCESSORIES:")
@@ -3137,24 +3381,30 @@ local function getClothingText(player)
 
 	for _, object in ipairs(character:GetChildren()) do
 		if object:IsA("Accessory") then
-			local handle = object:FindFirstChild("Handle")
-
 			local accessoryType = "Unknown"
 
-			if handle then
-				local attachment = handle:FindFirstChildWhichIsA("Attachment")
+			local success, result = pcall(function()
+				return object.AccessoryType
+			end)
 
-				if attachment then
-					accessoryType = attachment.Name
+			if success and result then
+				accessoryType = tostring(result)
+			else
+				local handle = object:FindFirstChild("Handle")
+
+				if handle then
+					local attachment =
+						handle:FindFirstChildWhichIsA("Attachment")
+
+					if attachment then
+						accessoryType = attachment.Name
+					end
 				end
 			end
 
 			table.insert(
 				accessories,
-				object.Name
-					.. " ["
-					.. accessoryType
-					.. "]"
+				accessoryType
 			)
 		end
 	end
@@ -3162,10 +3412,10 @@ local function getClothingText(player)
 	if #accessories == 0 then
 		table.insert(lines, "None")
 	else
-		for _, accessory in ipairs(accessories) do
+		for _, accessoryType in ipairs(accessories) do
 			table.insert(
 				lines,
-				"• " .. accessory
+				"• " .. accessoryType
 			)
 		end
 	end
@@ -3212,11 +3462,20 @@ local function showPlayerClothingDebug()
 		end
 	)
 
-	createToolSection(content, 167, "CLOTHING")
+	createToolAction(
+		content,
+		161,
+		"REFRESH CLOTHING",
+		function()
+			showPlayerClothingDebug()
+		end
+	)
+
+	createToolSection(content, 211, "CLOTHING")
 
 	createToolText(
 		content,
-		188,
+		232,
 		getClothingText(player),
 		230
 	)
@@ -3264,7 +3523,7 @@ createDebugToolButton(
 	DebugPage,
 	601,
 	"TOOL INSPECTOR",
-	"Inspect equipped and backpack tools",
+	"Inspect and give player tools",
 	showToolInspector
 )
 
@@ -3296,7 +3555,7 @@ createDebugToolButton(
 	DebugPage,
 	825,
 	"PLAYER CLOTHING DEBUG",
-	"Inspect shirt, pants and accessories",
+	"Inspect clothing names and accessory types",
 	showPlayerClothingDebug
 )
 
@@ -3670,18 +3929,6 @@ local function countRedHighlights()
 	end
 
 	return count
-end
-
-local function getMemoryUsage()
-	local success, value = pcall(function()
-		return Stats:GetTotalMemoryUsageMb()
-	end)
-
-	if success and value then
-		return value
-	end
-
-	return 0
 end
 
 local function updateDebugInfo()
