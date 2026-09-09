@@ -24,6 +24,7 @@ local Settings = {
 	AimPart = "Head",
 	AimSmoothness = 0.25,
 	AimRange = 500,
+	AimFOV = 150,
 
 	InstantAim = false,
 
@@ -50,6 +51,7 @@ local DEFAULT_SETTINGS = {
 	AimPart = "Head",
 	AimSmoothness = 0.25,
 	AimRange = 500,
+	AimFOV = 150,
 
 	InstantAim = false,
 
@@ -151,6 +153,34 @@ ScreenGui.IgnoreGuiInset = true
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 ScreenGui.DisplayOrder = 100
 ScreenGui.Parent = PlayerGui
+
+--==================================================
+-- AIM FOV CIRCLE
+--==================================================
+
+local AimFOVCircle = Instance.new("Frame")
+AimFOVCircle.Name = "AimFOVCircle"
+AimFOVCircle.AnchorPoint = Vector2.new(0.5, 0.5)
+AimFOVCircle.Position = UDim2.fromScale(0.5, 0.5)
+AimFOVCircle.Size = UDim2.fromOffset(
+	Settings.AimFOV * 2,
+	Settings.AimFOV * 2
+)
+AimFOVCircle.BackgroundTransparency = 1
+AimFOVCircle.BorderSizePixel = 0
+AimFOVCircle.Visible = false
+AimFOVCircle.ZIndex = 5
+AimFOVCircle.Parent = ScreenGui
+
+local AimFOVCorner = Instance.new("UICorner")
+AimFOVCorner.CornerRadius = UDim.new(1, 0)
+AimFOVCorner.Parent = AimFOVCircle
+
+local AimFOVStroke = Instance.new("UIStroke")
+AimFOVStroke.Color = COLORS.Pink
+AimFOVStroke.Thickness = 1.5
+AimFOVStroke.Transparency = 0.15
+AimFOVStroke.Parent = AimFOVCircle
 
 --==================================================
 -- OPEN BUTTON
@@ -520,7 +550,6 @@ local function showPage(pageName)
 	CurrentPage = newPage
 	newPage.Visible = true
 
-	-- RESET SCROLL POSITION WHEN OPENING A PAGE
 	newPage.CanvasPosition = Vector2.new(0, 0)
 
 	if not Settings.UIAnimations then
@@ -1027,6 +1056,51 @@ local function getAimPart(model)
 end
 
 --==================================================
+-- FOV CHECK
+--==================================================
+
+local function isPartInsideAimFOV(part)
+	if not part then
+		return false
+	end
+
+	Camera = workspace.CurrentCamera
+
+	if not Camera then
+		return false
+	end
+
+	local viewport = Camera.ViewportSize
+
+	if not viewport then
+		return false
+	end
+
+	local screenPosition, onScreen =
+		Camera:WorldToViewportPoint(part.Position)
+
+	if not onScreen or screenPosition.Z <= 0 then
+		return false
+	end
+
+	local screenCenter =
+		Vector2.new(
+			viewport.X / 2,
+			viewport.Y / 2
+		)
+
+	local screenDistance =
+		(
+			Vector2.new(
+				screenPosition.X,
+				screenPosition.Y
+			) - screenCenter
+		).Magnitude
+
+	return screenDistance <= Settings.AimFOV
+end
+
+--==================================================
 -- PLAYER TARGET
 --==================================================
 
@@ -1037,6 +1111,24 @@ local function getPlayerAimTarget()
 		return nil
 	end
 
+	Camera = workspace.CurrentCamera
+
+	if not Camera then
+		return nil
+	end
+
+	local viewport = Camera.ViewportSize
+
+	if not viewport then
+		return nil
+	end
+
+	local screenCenter =
+		Vector2.new(
+			viewport.X / 2,
+			viewport.Y / 2
+		)
+
 	local bestPlayer = nil
 	local bestDistance = math.huge
 
@@ -1044,16 +1136,34 @@ local function getPlayerAimTarget()
 		if isValidPlayerTarget(player) then
 			local character = player.Character
 			local root = getRoot(character)
+			local aimPart = getAimPart(character)
 
-			if root then
-				local distance =
-					(root.Position - localRoot.Position).Magnitude
+			if root and aimPart then
+				local screenPosition, onScreen =
+					Camera:WorldToViewportPoint(
+						aimPart.Position
+					)
 
-				if distance <= Settings.AimRange
-					and distance < bestDistance then
+				if onScreen and screenPosition.Z > 0 then
+					local screenDistance =
+						(
+							Vector2.new(
+								screenPosition.X,
+								screenPosition.Y
+							) - screenCenter
+						).Magnitude
 
-					bestDistance = distance
-					bestPlayer = player
+					if screenDistance <= Settings.AimFOV then
+						local distance =
+							(root.Position - localRoot.Position).Magnitude
+
+						if distance <= Settings.AimRange
+							and distance < bestDistance then
+
+							bestDistance = distance
+							bestPlayer = player
+						end
+					end
 				end
 			end
 		end
@@ -1157,22 +1267,58 @@ local function getNpcAimTarget()
 		return nil
 	end
 
+	Camera = workspace.CurrentCamera
+
+	if not Camera then
+		return nil
+	end
+
+	local viewport = Camera.ViewportSize
+
+	if not viewport then
+		return nil
+	end
+
+	local screenCenter =
+		Vector2.new(
+			viewport.X / 2,
+			viewport.Y / 2
+		)
+
 	local bestNPC = nil
 	local bestDistance = math.huge
 
 	for npc in pairs(NPCs) do
 		if npc.Parent and isNPC(npc) then
 			local root = getRoot(npc)
+			local aimPart = getAimPart(npc)
 
-			if root then
-				local distance =
-					(root.Position - localRoot.Position).Magnitude
+			if root and aimPart then
+				local screenPosition, onScreen =
+					Camera:WorldToViewportPoint(
+						aimPart.Position
+					)
 
-				if distance <= Settings.AimRange
-					and distance < bestDistance then
+				if onScreen and screenPosition.Z > 0 then
+					local screenDistance =
+						(
+							Vector2.new(
+								screenPosition.X,
+								screenPosition.Y
+							) - screenCenter
+						).Magnitude
 
-					bestDistance = distance
-					bestNPC = npc
+					if screenDistance <= Settings.AimFOV then
+						local distance =
+							(root.Position - localRoot.Position).Magnitude
+
+						if distance <= Settings.AimRange
+							and distance < bestDistance then
+
+							bestDistance = distance
+							bestNPC = npc
+						end
+					end
 				end
 			end
 		end
@@ -1190,7 +1336,23 @@ local function isCurrentPlayerTargetValid()
 		return false
 	end
 
-	return isValidPlayerTarget(CurrentTarget)
+	if not isValidPlayerTarget(CurrentTarget) then
+		return false
+	end
+
+	local character = CurrentTarget.Character
+
+	if not character then
+		return false
+	end
+
+	local aimPart = getAimPart(character)
+
+	if not aimPart then
+		return false
+	end
+
+	return isPartInsideAimFOV(aimPart)
 end
 
 local function isCurrentNpcTargetValid()
@@ -1198,8 +1360,21 @@ local function isCurrentNpcTargetValid()
 		return false
 	end
 
-	return CurrentNpcTarget.Parent
-		and isNPC(CurrentNpcTarget)
+	if not CurrentNpcTarget.Parent then
+		return false
+	end
+
+	if not isNPC(CurrentNpcTarget) then
+		return false
+	end
+
+	local aimPart = getAimPart(CurrentNpcTarget)
+
+	if not aimPart then
+		return false
+	end
+
+	return isPartInsideAimFOV(aimPart)
 end
 
 --==================================================
@@ -1420,12 +1595,61 @@ end)
 refreshRange()
 
 --==================================================
+-- AIM FOV
+--==================================================
+
+local FOVButton = Instance.new("TextButton")
+FOVButton.Size = UDim2.new(1, -16, 0, 40)
+FOVButton.Position = UDim2.fromOffset(8, 393)
+FOVButton.BackgroundColor3 = COLORS.Card
+FOVButton.BorderSizePixel = 0
+FOVButton.TextColor3 = COLORS.White
+FOVButton.TextSize = 9
+FOVButton.Font = Enum.Font.GothamBold
+FOVButton.AutoButtonColor = false
+FOVButton.Active = true
+FOVButton.Selectable = true
+FOVButton.ZIndex = 12
+FOVButton.Parent = AimPage
+
+local FOVCorner = Instance.new("UICorner")
+FOVCorner.CornerRadius = UDim.new(0, 9)
+FOVCorner.Parent = FOVButton
+
+styleButton(FOVButton)
+
+local function refreshFOV()
+	FOVButton.Text =
+		"AIM FOV:  "
+		.. tostring(Settings.AimFOV)
+		.. " PX"
+
+	AimFOVCircle.Size =
+		UDim2.fromOffset(
+			Settings.AimFOV * 2,
+			Settings.AimFOV * 2
+		)
+end
+
+FOVButton.Activated:Connect(function()
+	Settings.AimFOV += 25
+
+	if Settings.AimFOV > 300 then
+		Settings.AimFOV = 50
+	end
+
+	refreshFOV()
+end)
+
+refreshFOV()
+
+--==================================================
 -- SMOOTHNESS
 --==================================================
 
 local SmoothButton = Instance.new("TextButton")
 SmoothButton.Size = UDim2.new(1, -16, 0, 40)
-SmoothButton.Position = UDim2.fromOffset(8, 393)
+SmoothButton.Position = UDim2.fromOffset(8, 438)
 SmoothButton.BackgroundColor3 = COLORS.Card
 SmoothButton.BorderSizePixel = 0
 SmoothButton.TextColor3 = COLORS.White
@@ -1728,6 +1952,7 @@ ResetSettingsButton.Activated:Connect(function()
 	updatePanelSize()
 	refreshAimPart()
 	refreshRange()
+	refreshFOV()
 	refreshSmooth()
 
 	if DebugOverlayToggle then
@@ -1885,6 +2110,10 @@ local function updateDebugVisibility()
 	EspOverlay.Visible =
 		Settings.EspDebug
 		or Settings.NpcScanner
+
+	AimFOVCircle.Visible =
+		Settings.PlayerAimbot
+		or Settings.NpcAimbot
 end
 
 --==================================================
@@ -1958,6 +2187,8 @@ local function updateDebugInfo()
 		.. string.format("%.0f MB", getMemoryUsage())
 		.. "\nAIM RANGE: "
 		.. tostring(Settings.AimRange)
+		.. "\nAIM FOV: "
+		.. tostring(Settings.AimFOV)
 
 	TargetOverlayText.Text =
 		"TARGET DEBUG\n"
@@ -1979,6 +2210,8 @@ local function updateDebugInfo()
 		.. Settings.AimPart
 		.. "\nRange: "
 		.. tostring(Settings.AimRange)
+		.. "\nFOV: "
+		.. tostring(Settings.AimFOV)
 
 	MiscInfo.Text =
 		"Red ESP detected: "
