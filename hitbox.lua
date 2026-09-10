@@ -124,9 +124,6 @@ local TweenPage = TweenInfo.new(
   
 local IsOpen = true  
 local CurrentPage = nil  
-local openPanel
-local closePanel
-
   
 local CurrentTarget = nil  
 local CurrentNpcTarget = nil  
@@ -3621,1329 +3618,6 @@ SettingsInfo.TextYAlignment = Enum.TextYAlignment.Top
 SettingsInfo.ZIndex = 12  
 SettingsInfo.Parent = SettingsPage  
   
-
---==================================================
--- SERVER INFO PAGE
---==================================================
-
-local ServerInfoPage = createPage("ServerInfo")
-
-local ServerInfoTitleLabel
-local ServerInfoJobIdLabel
-local ServerInfoPlaceIdLabel
-local ServerInfoPlayersLabel
-local ServerInfoNPCsLabel
-local ServerInfoServerTypeLabel
-local ServerInfoUptimeLabel
-local ServerInfoRefreshButton
-local ServerInfoStatusLabel
-local ServerInfoLastRefresh = 0
-local ServerInfoRefreshInterval = 1
-
-local function createInfoCard(parent, y, title, description)
-	local card = Instance.new("Frame")
-	card.Size = UDim2.new(1, -16, 0, 58)
-	card.Position = UDim2.fromOffset(8, y)
-	card.BackgroundColor3 = COLORS.Card
-	card.BorderSizePixel = 0
-	card.ZIndex = 12
-	card.Parent = parent
-
-	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0, 10)
-	corner.Parent = card
-
-	local stroke = Instance.new("UIStroke")
-	stroke.Color = COLORS.Stroke
-	stroke.Thickness = 1
-	stroke.Parent = card
-
-	local titleLabel = Instance.new("TextLabel")
-	titleLabel.Name = "Title"
-	titleLabel.BackgroundTransparency = 1
-	titleLabel.Position = UDim2.fromOffset(12, 7)
-	titleLabel.Size = UDim2.new(1, -24, 0, 18)
-	titleLabel.Text = title
-	titleLabel.TextColor3 = COLORS.White
-	titleLabel.TextSize = 10
-	titleLabel.Font = Enum.Font.GothamBold
-	titleLabel.TextXAlignment = Enum.TextXAlignment.Left
-	titleLabel.ZIndex = 13
-	titleLabel.Parent = card
-
-	local valueLabel = Instance.new("TextLabel")
-	valueLabel.Name = "Value"
-	valueLabel.BackgroundTransparency = 1
-	valueLabel.Position = UDim2.fromOffset(12, 27)
-	valueLabel.Size = UDim2.new(1, -24, 0, 21)
-	valueLabel.Text = description
-	valueLabel.TextColor3 = COLORS.Gray
-	valueLabel.TextSize = 8
-	valueLabel.Font = Enum.Font.Code
-	valueLabel.TextXAlignment = Enum.TextXAlignment.Left
-	valueLabel.TextTruncate = Enum.TextTruncate.AtEnd
-	valueLabel.ZIndex = 13
-	valueLabel.Parent = card
-
-	return card, valueLabel
-end
-
-createPageHeader(
-	ServerInfoPage,
-	"SERVER INFO",
-	"Live information about the current Roblox server"
-)
-
-local _, ServerInfoJobIdValue = createInfoCard(
-	ServerInfoPage,
-	52,
-	"JOB ID",
-	"Loading..."
-)
-ServerInfoJobIdLabel = ServerInfoJobIdValue
-
-local _, ServerInfoPlaceIdValue = createInfoCard(
-	ServerInfoPage,
-	117,
-	"PLACE ID",
-	"Loading..."
-)
-ServerInfoPlaceIdLabel = ServerInfoPlaceIdValue
-
-local _, ServerInfoPlayersValue = createInfoCard(
-	ServerInfoPage,
-	182,
-	"PLAYER COUNT",
-	"Loading..."
-)
-ServerInfoPlayersLabel = ServerInfoPlayersValue
-
-local _, ServerInfoNPCsValue = createInfoCard(
-	ServerInfoPage,
-	247,
-	"NPC COUNT",
-	"Loading..."
-)
-ServerInfoNPCsLabel = ServerInfoNPCsValue
-
-local _, ServerInfoServerTypeValue = createInfoCard(
-	ServerInfoPage,
-	312,
-	"SERVER TYPE",
-	"Loading..."
-)
-ServerInfoServerTypeLabel = ServerInfoServerTypeValue
-
-local _, ServerInfoUptimeValue = createInfoCard(
-	ServerInfoPage,
-	377,
-	"SESSION UPTIME",
-	"Loading..."
-)
-ServerInfoUptimeLabel = ServerInfoUptimeValue
-
-ServerInfoRefreshButton = Instance.new("TextButton")
-ServerInfoRefreshButton.Name = "RefreshServerInfo"
-ServerInfoRefreshButton.Size = UDim2.new(1, -16, 0, 42)
-ServerInfoRefreshButton.Position = UDim2.fromOffset(8, 442)
-ServerInfoRefreshButton.BackgroundColor3 = COLORS.Card
-ServerInfoRefreshButton.BorderSizePixel = 0
-ServerInfoRefreshButton.Text = "REFRESH SERVER INFO"
-ServerInfoRefreshButton.TextColor3 = COLORS.White
-ServerInfoRefreshButton.TextSize = 9
-ServerInfoRefreshButton.Font = Enum.Font.GothamBold
-ServerInfoRefreshButton.AutoButtonColor = false
-ServerInfoRefreshButton.Active = true
-ServerInfoRefreshButton.Selectable = true
-ServerInfoRefreshButton.ZIndex = 12
-ServerInfoRefreshButton.Parent = ServerInfoPage
-
-local ServerInfoRefreshCorner = Instance.new("UICorner")
-ServerInfoRefreshCorner.CornerRadius = UDim.new(0, 9)
-ServerInfoRefreshCorner.Parent = ServerInfoRefreshButton
-styleButton(ServerInfoRefreshButton)
-
-ServerInfoStatusLabel = Instance.new("TextLabel")
-ServerInfoStatusLabel.BackgroundTransparency = 1
-ServerInfoStatusLabel.Position = UDim2.fromOffset(10, 492)
-ServerInfoStatusLabel.Size = UDim2.new(1, -20, 0, 34)
-ServerInfoStatusLabel.Text = "Automatic refresh: every 1 second"
-ServerInfoStatusLabel.TextColor3 = COLORS.Gray
-ServerInfoStatusLabel.TextSize = 8
-ServerInfoStatusLabel.Font = Enum.Font.Gotham
-ServerInfoStatusLabel.TextXAlignment = Enum.TextXAlignment.Left
-ServerInfoStatusLabel.TextYAlignment = Enum.TextYAlignment.Top
-ServerInfoStatusLabel.ZIndex = 12
-ServerInfoStatusLabel.Parent = ServerInfoPage
-
-local function countServerNPCs()
-	local count = 0
-	local seen = {}
-
-	for _, descendant in ipairs(workspace:GetDescendants()) do
-		if descendant:IsA("Model") and not seen[descendant] then
-			local humanoid = descendant:FindFirstChildOfClass("Humanoid")
-
-			if humanoid then
-				local player = Players:GetPlayerFromCharacter(descendant)
-
-				if not player then
-					seen[descendant] = true
-					count += 1
-				end
-			end
-		end
-	end
-
-	return count
-end
-
-local function getServerTypeText()
-	if game:GetService("RunService"):IsStudio() then
-		return "STUDIO / LOCAL TEST"
-	end
-
-	return "LIVE SERVER"
-end
-
-local ServerInfoStartTime = os.clock()
-
-local function formatUptime(seconds)
-	seconds = math.max(0, math.floor(seconds))
-
-	local days = math.floor(seconds / 86400)
-	seconds %= 86400
-
-	local hours = math.floor(seconds / 3600)
-	seconds %= 3600
-
-	local minutes = math.floor(seconds / 60)
-	seconds %= 60
-
-	if days > 0 then
-		return string.format("%dd %02dh %02dm %02ds", days, hours, minutes, seconds)
-	end
-
-	if hours > 0 then
-		return string.format("%02dh %02dm %02ds", hours, minutes, seconds)
-	end
-
-	return string.format("%02dm %02ds", minutes, seconds)
-end
-
-local function updateServerInfo()
-	if not ServerInfoPage or not ServerInfoPage.Parent then
-		return
-	end
-
-	local jobId = game.JobId
-	local placeId = game.PlaceId
-	local playerCount = #Players:GetPlayers()
-	local maxPlayers = Players.MaxPlayers
-	local npcCount = countServerNPCs()
-
-	if jobId == "" then
-		jobId = "Studio session / JobId unavailable"
-	end
-
-	ServerInfoJobIdLabel.Text = jobId
-	ServerInfoPlaceIdLabel.Text = tostring(placeId)
-	ServerInfoPlayersLabel.Text = string.format("%d / %d players", playerCount, maxPlayers)
-	ServerInfoNPCsLabel.Text = string.format("%d humanoid NPC models", npcCount)
-	ServerInfoServerTypeLabel.Text = getServerTypeText()
-	ServerInfoUptimeLabel.Text = formatUptime(os.clock() - ServerInfoStartTime)
-	ServerInfoLastRefresh = os.clock()
-	ServerInfoStatusLabel.Text = "Automatic refresh: every 1 second  •  Updated just now"
-end
-
-ServerInfoRefreshButton.Activated:Connect(function()
-	updateServerInfo()
-	ServerInfoStatusLabel.Text = "Manual refresh complete"
-end)
-
-updateServerInfo()
-
-table.insert(Connections, RunService.Heartbeat:Connect(function()
-	if os.clock() - ServerInfoLastRefresh >= ServerInfoRefreshInterval then
-		updateServerInfo()
-	end
-end))
-
--- Add the Server Info category without disturbing the original menu entries.
-local ServerInfoCategoryButton = createCategoryButton(
-	HomePage,
-	UDim2.fromOffset(8, 327),
-	"SERVER INFO",
-	"JobId, PlaceId, players and NPC information",
-	"▣",
-	function()
-		showPage("ServerInfo")
-	end
-)
-
---==================================================
--- EXTENDED SETTINGS SYSTEM
---==================================================
-
--- These settings are intentionally kept separate from the original combat
--- settings above. This makes it possible to reset interface preferences
--- without changing combat behavior accidentally.
-
-local ExtendedSettings = {
-	UITransparency = 0,
-	UIScale = 1,
-	Theme = "Neon",
-	SaveVersion = 1,
-	Keybinds = {
-		TogglePanel = Enum.KeyCode.RightShift,
-		PlayerAimbot = nil,
-		NpcAimbot = nil,
-	},
-	TabVisibility = {
-		Aim = true,
-		Debug = true,
-		Misc = true,
-		ServerInfo = true,
-		Settings = true,
-	},
-}
-
-local DEFAULT_EXTENDED_SETTINGS = {
-	UITransparency = 0,
-	UIScale = 1,
-	Theme = "Neon",
-	SaveVersion = 1,
-	Keybinds = {
-		TogglePanel = Enum.KeyCode.RightShift,
-		PlayerAimbot = nil,
-		NpcAimbot = nil,
-	},
-	TabVisibility = {
-		Aim = true,
-		Debug = true,
-		Misc = true,
-		ServerInfo = true,
-		Settings = true,
-	},
-}
-
-local function deepCopy(value)
-	if type(value) ~= "table" then
-		return value
-	end
-
-	local copy = {}
-
-	for key, item in pairs(value) do
-		copy[key] = deepCopy(item)
-	end
-
-	return copy
-end
-
-local function restoreTable(destination, source)
-	for key in pairs(destination) do
-		destination[key] = nil
-	end
-
-	for key, value in pairs(source) do
-		destination[key] = deepCopy(value)
-	end
-end
-
-local function getSettingsSnapshot()
-	return {
-		Combat = deepCopy(Settings),
-		Interface = deepCopy(ExtendedSettings),
-	}
-end
-
-local SavedSettingsSnapshot = getSettingsSnapshot()
-local LastSavedSettingsText = "No local snapshot saved yet"
-
-local function saveSettingsSnapshot()
-	SavedSettingsSnapshot = getSettingsSnapshot()
-	LastSavedSettingsText = os.date("%H:%M:%S")
-	return true
-end
-
-local function loadSettingsSnapshot(snapshot)
-	if type(snapshot) ~= "table" then
-		return false
-	end
-
-	if type(snapshot.Combat) == "table" then
-		for key, value in pairs(snapshot.Combat) do
-			Settings[key] = deepCopy(value)
-		end
-	end
-
-	if type(snapshot.Interface) == "table" then
-		restoreTable(ExtendedSettings, snapshot.Interface)
-	end
-
-	return true
-end
-
---==================================================
--- UI SCALE
---==================================================
-
-local PanelScale = Instance.new("UIScale")
-PanelScale.Name = "PanelScale"
-PanelScale.Scale = ExtendedSettings.UIScale
-PanelScale.Parent = Main
-
-local function setUIScale(value)
-	value = tonumber(value) or 1
-	value = math.clamp(value, 0.75, 1.25)
-
-	ExtendedSettings.UIScale = value
-	PanelScale.Scale = value
-end
-
---==================================================
--- UI TRANSPARENCY
---==================================================
-
-local TransparencyObjects = {}
-
-local function registerTransparencyObject(object, property, baseValue)
-	if not object then
-		return
-	end
-
-	TransparencyObjects[#TransparencyObjects + 1] = {
-		Object = object,
-		Property = property,
-		Base = baseValue,
-	}
-end
-
-registerTransparencyObject(Main, "BackgroundTransparency", Main.BackgroundTransparency)
-registerTransparencyObject(Header, "BackgroundTransparency", Header.BackgroundTransparency)
-registerTransparencyObject(AdminBadge, "BackgroundTransparency", AdminBadge.BackgroundTransparency)
-registerTransparencyObject(Close, "BackgroundTransparency", Close.BackgroundTransparency)
-registerTransparencyObject(OpenButton, "BackgroundTransparency", OpenButton.BackgroundTransparency)
-
-local function applyUITransparency()
-	local amount = math.clamp(tonumber(ExtendedSettings.UITransparency) or 0, 0, 0.65)
-
-	for _, entry in ipairs(TransparencyObjects) do
-		local object = entry.Object
-
-		if object and object.Parent then
-			local base = entry.Base or 0
-			object[entry.Property] = math.clamp(base + amount, 0, 1)
-		end
-	end
-end
-
---==================================================
--- THEMES
---==================================================
-
-local THEME_PALETTES = {
-	Neon = {
-		Background = Color3.fromRGB(7, 8, 12),
-		Panel = Color3.fromRGB(11, 12, 18),
-		Panel2 = Color3.fromRGB(16, 17, 25),
-		Card = Color3.fromRGB(18, 20, 29),
-		CardHover = Color3.fromRGB(27, 22, 34),
-		Stroke = Color3.fromRGB(45, 48, 62),
-		Pink = Color3.fromRGB(255, 35, 115),
-		PinkDark = Color3.fromRGB(170, 20, 75),
-		White = Color3.fromRGB(245, 245, 250),
-		Gray = Color3.fromRGB(150, 153, 165),
-		Gray2 = Color3.fromRGB(95, 99, 112),
-		Green = Color3.fromRGB(70, 220, 140),
-		Red = Color3.fromRGB(255, 70, 90),
-		Yellow = Color3.fromRGB(255, 210, 80),
-	},
-
-	Cyber = {
-		Background = Color3.fromRGB(5, 10, 15),
-		Panel = Color3.fromRGB(7, 17, 24),
-		Panel2 = Color3.fromRGB(10, 24, 32),
-		Card = Color3.fromRGB(12, 28, 36),
-		CardHover = Color3.fromRGB(15, 42, 49),
-		Stroke = Color3.fromRGB(35, 77, 86),
-		Pink = Color3.fromRGB(50, 220, 210),
-		PinkDark = Color3.fromRGB(25, 130, 125),
-		White = Color3.fromRGB(235, 250, 250),
-		Gray = Color3.fromRGB(135, 170, 174),
-		Gray2 = Color3.fromRGB(70, 105, 110),
-		Green = Color3.fromRGB(80, 235, 160),
-		Red = Color3.fromRGB(255, 90, 100),
-		Yellow = Color3.fromRGB(240, 220, 90),
-	},
-
-	Mono = {
-		Background = Color3.fromRGB(10, 10, 10),
-		Panel = Color3.fromRGB(18, 18, 18),
-		Panel2 = Color3.fromRGB(25, 25, 25),
-		Card = Color3.fromRGB(32, 32, 32),
-		CardHover = Color3.fromRGB(45, 45, 45),
-		Stroke = Color3.fromRGB(72, 72, 72),
-		Pink = Color3.fromRGB(225, 225, 225),
-		PinkDark = Color3.fromRGB(150, 150, 150),
-		White = Color3.fromRGB(245, 245, 245),
-		Gray = Color3.fromRGB(165, 165, 165),
-		Gray2 = Color3.fromRGB(105, 105, 105),
-		Green = Color3.fromRGB(180, 220, 180),
-		Red = Color3.fromRGB(225, 170, 170),
-		Yellow = Color3.fromRGB(220, 210, 160),
-	},
-}
-
-local function colorDistance(a, b)
-	return math.abs(a.R - b.R) + math.abs(a.G - b.G) + math.abs(a.B - b.B)
-end
-
-local function findPaletteKey(color, palette)
-	local bestKey = nil
-	local bestDistance = math.huge
-
-	for key, paletteColor in pairs(palette) do
-		local distance = colorDistance(color, paletteColor)
-
-		if distance < bestDistance then
-			bestDistance = distance
-			bestKey = key
-		end
-	end
-
-	return bestKey, bestDistance
-end
-
-local function applyTheme(themeName)
-	local targetPalette = THEME_PALETTES[themeName]
-
-	if not targetPalette then
-		themeName = "Neon"
-		targetPalette = THEME_PALETTES.Neon
-	end
-
-	local oldPalette = COLORS
-	local colorMap = {}
-
-	for key, oldColor in pairs(oldPalette) do
-		colorMap[key] = targetPalette[key] or oldColor
-	end
-
-	for _, object in ipairs(ScreenGui:GetDescendants()) do
-		if object:IsA("Frame") or object:IsA("TextButton") or object:IsA("ScrollingFrame") then
-			local key = findPaletteKey(object.BackgroundColor3, oldPalette)
-
-			if key and colorMap[key] then
-				object.BackgroundColor3 = colorMap[key]
-			end
-		elseif object:IsA("TextLabel") then
-			local key = findPaletteKey(object.TextColor3, oldPalette)
-
-			if key and colorMap[key] then
-				object.TextColor3 = colorMap[key]
-			end
-		elseif object:IsA("UIStroke") then
-			local key = findPaletteKey(object.Color, oldPalette)
-
-			if key and colorMap[key] then
-				object.Color = colorMap[key]
-			end
-		end
-	end
-
-	for key, color in pairs(targetPalette) do
-		COLORS[key] = color
-	end
-
-	AimFOVStroke.Color = COLORS.Pink
-	OpenStroke.Color = COLORS.Pink
-	MainStroke.Color = COLORS.Pink
-	ExtendedSettings.Theme = themeName
-end
-
---==================================================
--- TAB VISIBILITY
---==================================================
-
-local TabButtons = {
-	Aim = nil,
-	Debug = nil,
-	Misc = nil,
-	ServerInfo = ServerInfoCategoryButton,
-	Settings = nil,
-}
-
-local function findHomeCategoryButton(titleText)
-	for _, child in ipairs(HomePage:GetChildren()) do
-		if child:IsA("TextButton") then
-			for _, nested in ipairs(child:GetChildren()) do
-				if nested:IsA("TextLabel") and nested.Text == titleText then
-					return child
-				end
-			end
-		end
-	end
-
-	return nil
-end
-
-TabButtons.Aim = findHomeCategoryButton("AIM")
-TabButtons.Debug = findHomeCategoryButton("DEBUG")
-TabButtons.Misc = findHomeCategoryButton("MISC")
-TabButtons.Settings = findHomeCategoryButton("SETTINGS")
-
-local function refreshTabVisibility()
-	for pageName, isVisible in pairs(ExtendedSettings.TabVisibility) do
-		local page = Pages[pageName]
-		local button = TabButtons[pageName]
-
-		if button and button.Parent then
-			button.Visible = isVisible
-		end
-
-		if page and page.Parent and page ~= CurrentPage then
-			page.Visible = false
-		end
-	end
-
-	if CurrentPage and ExtendedSettings.TabVisibility[CurrentPage.Name] == false then
-		showPage("Home")
-	end
-end
-
-local function setTabVisibility(tabName, visible)
-	if ExtendedSettings.TabVisibility[tabName] == nil then
-		return
-	end
-
-	ExtendedSettings.TabVisibility[tabName] = visible
-	refreshTabVisibility()
-end
-
---==================================================
--- SETTINGS UI HELPERS
---==================================================
-
-local function createSectionLabel(parent, y, text)
-	local label = Instance.new("TextLabel")
-	label.BackgroundTransparency = 1
-	label.Position = UDim2.fromOffset(10, y)
-	label.Size = UDim2.new(1, -20, 0, 20)
-	label.Text = text
-	label.TextColor3 = COLORS.Pink
-	label.TextSize = 9
-	label.Font = Enum.Font.GothamBold
-	label.TextXAlignment = Enum.TextXAlignment.Left
-	label.ZIndex = 13
-	label.Parent = parent
-
-	return label
-end
-
-local function createActionButton(parent, y, title, description, callback)
-	local button = Instance.new("TextButton")
-	button.Size = UDim2.new(1, -16, 0, 54)
-	button.Position = UDim2.fromOffset(8, y)
-	button.BackgroundColor3 = COLORS.Card
-	button.BorderSizePixel = 0
-	button.Text = ""
-	button.AutoButtonColor = false
-	button.Active = true
-	button.Selectable = true
-	button.ZIndex = 12
-	button.Parent = parent
-
-	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0, 10)
-	corner.Parent = button
-
-	local titleLabel = Instance.new("TextLabel")
-	titleLabel.Name = "ActionTitle"
-	titleLabel.BackgroundTransparency = 1
-	titleLabel.Position = UDim2.fromOffset(12, 7)
-	titleLabel.Size = UDim2.new(1, -24, 0, 18)
-	titleLabel.Text = title
-	titleLabel.TextColor3 = COLORS.White
-	titleLabel.TextSize = 10
-	titleLabel.Font = Enum.Font.GothamBold
-	titleLabel.TextXAlignment = Enum.TextXAlignment.Left
-	titleLabel.ZIndex = 13
-	titleLabel.Parent = button
-
-	local descriptionLabel = Instance.new("TextLabel")
-	descriptionLabel.Name = "ActionDescription"
-	descriptionLabel.BackgroundTransparency = 1
-	descriptionLabel.Position = UDim2.fromOffset(12, 28)
-	descriptionLabel.Size = UDim2.new(1, -24, 0, 17)
-	descriptionLabel.Text = description
-	descriptionLabel.TextColor3 = COLORS.Gray
-	descriptionLabel.TextSize = 7.5
-	descriptionLabel.Font = Enum.Font.Gotham
-	descriptionLabel.TextXAlignment = Enum.TextXAlignment.Left
-	descriptionLabel.ZIndex = 13
-	descriptionLabel.Parent = button
-
-	styleButton(button)
-
-	button.Activated:Connect(function()
-		if callback then
-			callback(button)
-		end
-	end)
-
-	return button
-end
-
-local function createValueButton(parent, y, title, description, initialValue, values, onChanged)
-	local button = Instance.new("TextButton")
-	button.Size = UDim2.new(1, -16, 0, 58)
-	button.Position = UDim2.fromOffset(8, y)
-	button.BackgroundColor3 = COLORS.Card
-	button.BorderSizePixel = 0
-	button.Text = ""
-	button.AutoButtonColor = false
-	button.Active = true
-	button.Selectable = true
-	button.ZIndex = 12
-	button.Parent = parent
-
-	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0, 10)
-	corner.Parent = button
-
-	local titleLabel = Instance.new("TextLabel")
-	titleLabel.BackgroundTransparency = 1
-	titleLabel.Position = UDim2.fromOffset(12, 7)
-	titleLabel.Size = UDim2.new(1, -170, 0, 18)
-	titleLabel.Text = title
-	titleLabel.TextColor3 = COLORS.White
-	titleLabel.TextSize = 10
-	titleLabel.Font = Enum.Font.GothamBold
-	titleLabel.TextXAlignment = Enum.TextXAlignment.Left
-	titleLabel.ZIndex = 13
-	titleLabel.Parent = button
-
-	local descriptionLabel = Instance.new("TextLabel")
-	descriptionLabel.BackgroundTransparency = 1
-	descriptionLabel.Position = UDim2.fromOffset(12, 28)
-	descriptionLabel.Size = UDim2.new(1, -170, 0, 17)
-	descriptionLabel.Text = description
-	descriptionLabel.TextColor3 = COLORS.Gray
-	descriptionLabel.TextSize = 7.5
-	descriptionLabel.Font = Enum.Font.Gotham
-	descriptionLabel.TextXAlignment = Enum.TextXAlignment.Left
-	descriptionLabel.ZIndex = 13
-	descriptionLabel.Parent = button
-
-	local valueLabel = Instance.new("TextLabel")
-	valueLabel.Name = "Value"
-	valueLabel.BackgroundTransparency = 1
-	valueLabel.AnchorPoint = Vector2.new(1, 0.5)
-	valueLabel.Position = UDim2.new(1, -12, 0.5, 0)
-	valueLabel.Size = UDim2.fromOffset(135, 28)
-	valueLabel.Text = tostring(initialValue)
-	valueLabel.TextColor3 = COLORS.Pink
-	valueLabel.TextSize = 9
-	valueLabel.Font = Enum.Font.GothamBold
-	valueLabel.TextXAlignment = Enum.TextXAlignment.Right
-	valueLabel.ZIndex = 13
-	valueLabel.Parent = button
-
-	local index = 1
-
-	for i, value in ipairs(values) do
-		if value == initialValue then
-			index = i
-			break
-		end
-	end
-
-	local function refresh()
-		valueLabel.Text = tostring(values[index])
-	end
-
-	button.Activated:Connect(function()
-		index += 1
-
-		if index > #values then
-			index = 1
-		end
-
-		refresh()
-
-		if onChanged then
-			onChanged(values[index])
-		end
-	end)
-
-	styleButton(button)
-	refresh()
-
-	return {
-		Button = button,
-		Refresh = refresh,
-		GetValue = function()
-			return values[index]
-		end,
-		SetValue = function(value)
-			for i, item in ipairs(values) do
-				if item == value then
-					index = i
-					refresh()
-					return
-				end
-			end
-		end,
-	}
-end
-
---==================================================
--- KEYBIND MANAGER
---==================================================
-
-local PendingKeybind = nil
-local KeybindButtons = {}
-
-local function formatKeybind(keyCode)
-	if not keyCode then
-		return "UNBOUND"
-	end
-
-	local text = tostring(keyCode)
-	text = text:gsub("Enum.KeyCode.", "")
-	return text
-end
-
-local function getKeybindActionName(actionName)
-	if actionName == "TogglePanel" then
-		return "Toggle Panel"
-	elseif actionName == "PlayerAimbot" then
-		return "Player Aimbot"
-	elseif actionName == "NpcAimbot" then
-		return "NPC Aimbot"
-	end
-
-	return actionName
-end
-
-local function runKeybindAction(actionName)
-	if actionName == "TogglePanel" then
-		-- The panel toggle is handled by the main input connection below.
-		-- This branch intentionally does not call a second toggle function.
-		return
-	end
-
-	if actionName == "PlayerAimbot" then
-		Settings.PlayerAimbot = not Settings.PlayerAimbot
-		return
-	end
-
-	if actionName == "NpcAimbot" then
-		Settings.NpcAimbot = not Settings.NpcAimbot
-		return
-	end
-end
-
-local function beginKeybindAssignment(actionName, button)
-	PendingKeybind = actionName
-
-	if button then
-		button.Text = "PRESS A KEY..."
-	end
-end
-
-local function updateKeybindButton(actionName)
-	local button = KeybindButtons[actionName]
-
-	if not button or not button.Parent then
-		return
-	end
-
-	button.Text = string.upper(getKeybindActionName(actionName)) .. "  •  " .. formatKeybind(ExtendedSettings.Keybinds[actionName])
-end
-
-local function refreshAllKeybindButtons()
-	for actionName in pairs(KeybindButtons) do
-		updateKeybindButton(actionName)
-	end
-end
-
-local function createKeybindButton(parent, y, actionName, description)
-	local button = Instance.new("TextButton")
-	button.Size = UDim2.new(1, -16, 0, 54)
-	button.Position = UDim2.fromOffset(8, y)
-	button.BackgroundColor3 = COLORS.Card
-	button.BorderSizePixel = 0
-	button.TextColor3 = COLORS.White
-	button.TextSize = 9
-	button.Font = Enum.Font.GothamBold
-	button.TextXAlignment = Enum.TextXAlignment.Left
-	button.Text = ""
-	button.AutoButtonColor = false
-	button.Active = true
-	button.Selectable = true
-	button.ZIndex = 12
-	button.Parent = parent
-
-	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0, 10)
-	corner.Parent = button
-
-	local descriptionLabel = Instance.new("TextLabel")
-	descriptionLabel.BackgroundTransparency = 1
-	descriptionLabel.Position = UDim2.fromOffset(12, 29)
-	descriptionLabel.Size = UDim2.new(1, -24, 0, 16)
-	descriptionLabel.Text = description
-	descriptionLabel.TextColor3 = COLORS.Gray
-	descriptionLabel.TextSize = 7.5
-	descriptionLabel.Font = Enum.Font.Gotham
-	descriptionLabel.TextXAlignment = Enum.TextXAlignment.Left
-	descriptionLabel.ZIndex = 13
-	descriptionLabel.Parent = button
-
-	styleButton(button)
-
-	KeybindButtons[actionName] = button
-	updateKeybindButton(actionName)
-
-	button.Activated:Connect(function()
-		beginKeybindAssignment(actionName, button)
-	end)
-
-	return button
-end
-
---==================================================
--- TAB VISIBILITY TOGGLES
---==================================================
-
-local TabVisibilityToggles = {}
-
-local function createTabVisibilityToggle(y, tabName, title, description)
-	local toggle = createToggle(
-		SettingsPage,
-		y,
-		title,
-		description,
-		function()
-			return ExtendedSettings.TabVisibility[tabName]
-		end,
-		function(value)
-			setTabVisibility(tabName, value)
-		end
-	)
-
-	TabVisibilityToggles[tabName] = toggle
-	return toggle
-end
-
---==================================================
--- CONFIG PROFILES
---==================================================
-
-local ConfigProfiles = {
-	Combat = getSettingsSnapshot(),
-	Debug = getSettingsSnapshot(),
-	Testing = getSettingsSnapshot(),
-}
-
-local CurrentProfileName = "Combat"
-
-local function saveCurrentProfile()
-	ConfigProfiles[CurrentProfileName] = getSettingsSnapshot()
-end
-
-local function loadProfile(profileName)
-	local snapshot = ConfigProfiles[profileName]
-
-	if not snapshot then
-		return false
-	end
-
-	saveCurrentProfile()
-	loadSettingsSnapshot(snapshot)
-
-	CurrentProfileName = profileName
-
-	applyUITransparency()
-	setUIScale(ExtendedSettings.UIScale)
-	applyTheme(ExtendedSettings.Theme)
-	refreshTabVisibility()
-	refreshAllKeybindButtons()
-	updatePanelSize()
-
-	return true
-end
-
-local function resetExtendedSettings()
-	restoreTable(ExtendedSettings, DEFAULT_EXTENDED_SETTINGS)
-	SavedSettingsSnapshot = getSettingsSnapshot()
-	LastSavedSettingsText = "Reset"
-
-	applyUITransparency()
-	setUIScale(1)
-	applyTheme("Neon")
-	refreshTabVisibility()
-	refreshAllKeybindButtons()
-end
-
---==================================================
--- EXTENDED SETTINGS PAGE CONTENT
---==================================================
-
-createSectionLabel(SettingsPage, 340, "LOCAL CONFIGURATION")
-
-local SaveSettingsButton = createActionButton(
-	SettingsPage,
-	365,
-	"SAVE SETTINGS",
-	"Save the current panel configuration to a local session snapshot",
-	function()
-		saveSettingsSnapshot()
-	end
-)
-
-local LoadSavedSettingsButton = createActionButton(
-	SettingsPage,
-	428,
-	"LOAD SAVED SETTINGS",
-	"Restore the most recently saved local snapshot",
-	function()
-		loadSettingsSnapshot(SavedSettingsSnapshot)
-		applyUITransparency()
-		setUIScale(ExtendedSettings.UIScale)
-		applyTheme(ExtendedSettings.Theme)
-		refreshTabVisibility()
-		refreshAllKeybindButtons()
-		updatePanelSize()
-	end
-)
-
-createSectionLabel(SettingsPage, 495, "UI APPEARANCE")
-
-local TransparencyValue = createValueButton(
-	SettingsPage,
-	520,
-	"UI TRANSPARENCY",
-	"Increase or decrease the base panel transparency",
-	"0%",
-	{"0%", "10%", "20%", "30%", "40%", "50%"},
-	function(value)
-		local number = tonumber(value:match("%d+")) or 0
-		ExtendedSettings.UITransparency = number / 100
-		applyUITransparency()
-	end
-)
-
-local UIScaleValue = createValueButton(
-	SettingsPage,
-	586,
-	"UI SCALE",
-	"Change the overall size of the panel",
-	"100%",
-	{"75%", "80%", "90%", "100%", "110%", "120%", "125%"},
-	function(value)
-		local number = tonumber(value:match("%d+")) or 100
-		setUIScale(number / 100)
-	end
-)
-
-local ThemeValue = createValueButton(
-	SettingsPage,
-	652,
-	"THEME SELECTOR",
-	"Cycle through the available panel themes",
-	"Neon",
-	{"Neon", "Cyber", "Mono"},
-	function(value)
-		applyTheme(value)
-	end
-)
-
-createSectionLabel(SettingsPage, 718, "KEYBIND MANAGER")
-
-local KeybindInfo = Instance.new("TextLabel")
-KeybindInfo.BackgroundTransparency = 1
-KeybindInfo.Position = UDim2.fromOffset(10, 743)
-KeybindInfo.Size = UDim2.new(1, -20, 0, 32)
-KeybindInfo.Text = "Click a function below, then press the key you want to assign."
-KeybindInfo.TextColor3 = COLORS.Gray
-KeybindInfo.TextSize = 8
-KeybindInfo.Font = Enum.Font.Gotham
-KeybindInfo.TextXAlignment = Enum.TextXAlignment.Left
-KeybindInfo.TextYAlignment = Enum.TextYAlignment.Top
-KeybindInfo.ZIndex = 12
-KeybindInfo.Parent = SettingsPage
-
-createKeybindButton(
-	SettingsPage,
-	780,
-	"TogglePanel",
-	"Toggle the main panel visibility"
-)
-
-createKeybindButton(
-	SettingsPage,
-	844,
-	"PlayerAimbot",
-	"Toggle the player aimbot state"
-)
-
-createKeybindButton(
-	SettingsPage,
-	908,
-	"NpcAimbot",
-	"Toggle the NPC aimbot state"
-)
-
-local KeybindResetButton = createActionButton(
-	SettingsPage,
-	972,
-	"RESET KEYBINDS",
-	"Restore RightShift and clear optional aim keybinds",
-	function()
-		ExtendedSettings.Keybinds.TogglePanel = Enum.KeyCode.RightShift
-		ExtendedSettings.Keybinds.PlayerAimbot = nil
-		ExtendedSettings.Keybinds.NpcAimbot = nil
-		PendingKeybind = nil
-		refreshAllKeybindButtons()
-	end
-)
-
-createSectionLabel(SettingsPage, 1038, "TAB VISIBILITY")
-
-createTabVisibilityToggle(
-	1063,
-	"Aim",
-	"AIM TAB",
-	"Show or hide the Aim category from the home screen"
-)
-
-createTabVisibilityToggle(
-	1122,
-	"Debug",
-	"DEBUG TAB",
-	"Show or hide the Debug category from the home screen"
-)
-
-createTabVisibilityToggle(
-	1181,
-	"Misc",
-	"MISC TAB",
-	"Show or hide the Misc category from the home screen"
-)
-
-createTabVisibilityToggle(
-	1240,
-	"ServerInfo",
-	"SERVER INFO TAB",
-	"Show or hide the Server Info category from the home screen"
-)
-
-createTabVisibilityToggle(
-	1299,
-	"Settings",
-	"SETTINGS TAB",
-	"Keep the Settings category accessible from the home screen"
-)
-
-createSectionLabel(SettingsPage, 1368, "CONFIG PROFILES")
-
-local ProfileValue = createValueButton(
-	SettingsPage,
-	1393,
-	"PROFILE",
-	"Select a profile to load or save",
-	"Combat",
-	{"Combat", "Debug", "Testing"},
-	function(value)
-		CurrentProfileName = value
-	end
-)
-
-local LoadProfileButton = createActionButton(
-	SettingsPage,
-	1459,
-	"LOAD PROFILE",
-	"Load the selected Combat, Debug or Testing configuration",
-	function()
-		local profileName = ProfileValue.GetValue()
-		loadProfile(profileName)
-	end
-)
-
-local SaveProfileButton = createActionButton(
-	SettingsPage,
-	1522,
-	"SAVE PROFILE",
-	"Save the current configuration into the selected profile",
-	function()
-		local profileName = ProfileValue.GetValue()
-		ConfigProfiles[profileName] = getSettingsSnapshot()
-		CurrentProfileName = profileName
-	end
-)
-
-local ResetExtendedSettingsButton = createActionButton(
-	SettingsPage,
-	1585,
-	"RESET SETTINGS",
-	"Reset interface preferences, keybinds, tabs, theme and scale",
-	function()
-		resetExtendedSettings()
-
-		if TransparencyValue and TransparencyValue.SetValue then
-			TransparencyValue.SetValue("0%")
-		end
-
-		if UIScaleValue and UIScaleValue.SetValue then
-			UIScaleValue.SetValue("100%")
-		end
-
-		if ThemeValue and ThemeValue.SetValue then
-			ThemeValue.SetValue("Neon")
-		end
-
-		for tabName, toggle in pairs(TabVisibilityToggles) do
-			if toggle and toggle.Refresh then
-				toggle.Refresh()
-			end
-		end
-
-		refreshAllKeybindButtons()
-		updatePanelSize()
-	end
-)
-
-local ExtendedSettingsInfo = Instance.new("TextLabel")
-ExtendedSettingsInfo.BackgroundTransparency = 1
-ExtendedSettingsInfo.Position = UDim2.fromOffset(10, 1650)
-ExtendedSettingsInfo.Size = UDim2.new(1, -20, 0, 78)
-ExtendedSettingsInfo.Text =
-	"SAVE SETTINGS uses a local session snapshot.\n"
-	.. "For permanent cross-server saving, a server Script with DataStoreService is required.\n"
-	.. "CONFIG PROFILES are also local to this running session."
-ExtendedSettingsInfo.TextColor3 = COLORS.Gray
-ExtendedSettingsInfo.TextSize = 8
-ExtendedSettingsInfo.Font = Enum.Font.Gotham
-ExtendedSettingsInfo.TextXAlignment = Enum.TextXAlignment.Left
-ExtendedSettingsInfo.TextYAlignment = Enum.TextYAlignment.Top
-ExtendedSettingsInfo.ZIndex = 12
-ExtendedSettingsInfo.Parent = SettingsPage
-
---==================================================
--- RESET BUTTON COMPATIBILITY
---==================================================
-
-local OriginalResetSettingsActivated
-
--- The original RESET ALL SETTINGS button remains intact. This helper makes
--- the new interface settings resettable without replacing the original
--- combat reset logic.
-OriginalResetSettingsActivated = ResetSettingsButton.Activated:Connect(function()
-	resetExtendedSettings()
-
-	if TransparencyValue and TransparencyValue.SetValue then
-		TransparencyValue.SetValue("0%")
-	end
-
-	if UIScaleValue and UIScaleValue.SetValue then
-		UIScaleValue.SetValue("100%")
-	end
-
-	if ThemeValue and ThemeValue.SetValue then
-		ThemeValue.SetValue("Neon")
-	end
-
-	for _, toggle in pairs(TabVisibilityToggles) do
-		if toggle and toggle.Refresh then
-			toggle.Refresh()
-		end
-	end
-
-	refreshAllKeybindButtons()
-	updatePanelSize()
-end)
-
---==================================================
--- KEY INPUT FOR THE KEYBIND MANAGER
---==================================================
-
-UserInputService.InputBegan:Connect(function(input, processed)
-	if not PendingKeybind then
-		return
-	end
-
-	if input.UserInputType ~= Enum.UserInputType.Keyboard then
-		return
-	end
-
-	local actionName = PendingKeybind
-	local keyCode = input.KeyCode
-
-	if keyCode == Enum.KeyCode.Unknown then
-		return
-	end
-
-	ExtendedSettings.Keybinds[actionName] = keyCode
-	PendingKeybind = nil
-	refreshAllKeybindButtons()
-end)
-
---==================================================
--- KEYBIND EXECUTION LOOP
---==================================================
-
-UserInputService.InputBegan:Connect(function(input, processed)
-	if processed then
-		return
-	end
-
-	if input.UserInputType ~= Enum.UserInputType.Keyboard then
-		return
-	end
-
-	if PendingKeybind then
-		return
-	end
-
-	local keyCode = input.KeyCode
-
-	for actionName, assignedKey in pairs(ExtendedSettings.Keybinds) do
-		if assignedKey and keyCode == assignedKey then
-			if actionName == "TogglePanel" then
-				-- This is intentionally implemented directly here so the new
-				-- settings system never depends on declaration order of the
-				-- original openPanel/closePanel functions.
-				if IsOpen then
-					Main.Visible = false
-					IsOpen = false
-				else
-					Main.Visible = true
-					IsOpen = true
-					HomePage.Visible = true
-					showPage("Home")
-				end
-			else
-				runKeybindAction(actionName)
-			end
-		end
-	end
-end)
-
---==================================================
--- APPLY INITIAL EXTENDED SETTINGS
---==================================================
-
-applyUITransparency()
-setUIScale(ExtendedSettings.UIScale)
-applyTheme(ExtendedSettings.Theme)
-refreshTabVisibility()
-refreshAllKeybindButtons()
-
-
 --==================================================  
 -- DEBUG OVERLAY  
 --==================================================  
@@ -5359,7 +4033,7 @@ end)
   
 local NormalPanelSize = getNormalPanelSize()  
   
-openPanel = function()  
+local function openPanel()  
 	if IsOpen then  
 		return  
 	end  
@@ -5402,7 +4076,7 @@ openPanel = function()
 	):Play()  
 end  
   
-closePanel = function()  
+local function closePanel()  
 	if not IsOpen then  
 		return  
 	end  
@@ -5472,6 +4146,8 @@ Close.Activated:Connect(function()
 	closePanel()  
 end)  
   
+--==================================================  
+-- RIGHT SHIFT  
 --==================================================  
   
 UserInputService.InputBegan:Connect(  
@@ -5555,6 +4231,993 @@ showPage("Home")
 pcall(updateDebugVisibility)
 pcall(updateDebugInfo)
   
+
+
+--==================================================
+-- OPTIONAL EXTENSIONS: SERVER INFO + ADVANCED SETTINGS
+--==================================================
+-- IMPORTANT:
+-- This block is deliberately placed AFTER the original UI initialization.
+-- The original working menu is therefore created and shown first.
+-- If an optional feature ever fails, it cannot prevent the base menu from
+-- appearing.
+
+local ExtensionServerInfoPage = createPage("ExtensionServerInfo")
+
+local ExtensionServerInfo = {
+	StartedAt = os.clock(),
+	LastUpdate = 0,
+	RefreshInterval = 1,
+	Labels = {},
+}
+
+local ExtensionSettings = {
+	UITransparency = 0,
+	UIScale = 1,
+	Theme = "Neon",
+	Keybinds = {
+		TogglePanel = Enum.KeyCode.RightShift,
+		PlayerAimbot = nil,
+		NpcAimbot = nil,
+	},
+	TabVisibility = {
+		Aim = true,
+		Debug = true,
+		Misc = true,
+		ExtensionServerInfo = true,
+		Settings = true,
+	},
+}
+
+local ExtensionDefaultSettings = {
+	UITransparency = 0,
+	UIScale = 1,
+	Theme = "Neon",
+	Keybinds = {
+		TogglePanel = Enum.KeyCode.RightShift,
+		PlayerAimbot = nil,
+		NpcAimbot = nil,
+	},
+	TabVisibility = {
+		Aim = true,
+		Debug = true,
+		Misc = true,
+		ExtensionServerInfo = true,
+		Settings = true,
+	},
+}
+
+local function ExtensionDeepCopy(value)
+	if type(value) ~= "table" then
+		return value
+	end
+
+	local copy = {}
+
+	for key, child in pairs(value) do
+		copy[key] = ExtensionDeepCopy(child)
+	end
+
+	return copy
+end
+
+local function ExtensionCreateHeader(parent, title, subtitle)
+	local titleLabel = Instance.new("TextLabel")
+	titleLabel.Name = "ExtensionTitle"
+	titleLabel.BackgroundTransparency = 1
+	titleLabel.Position = UDim2.fromOffset(7, 0)
+	titleLabel.Size = UDim2.new(1, -100, 0, 23)
+	titleLabel.Text = title
+	titleLabel.TextColor3 = COLORS.White
+	titleLabel.TextSize = 18
+	titleLabel.Font = Enum.Font.GothamBold
+	titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+	titleLabel.ZIndex = 14
+	titleLabel.Parent = parent
+
+	local subtitleLabel = Instance.new("TextLabel")
+	subtitleLabel.Name = "ExtensionSubtitle"
+	subtitleLabel.BackgroundTransparency = 1
+	subtitleLabel.Position = UDim2.fromOffset(8, 23)
+	subtitleLabel.Size = UDim2.new(1, -100, 0, 17)
+	subtitleLabel.Text = subtitle
+	subtitleLabel.TextColor3 = COLORS.Gray
+	subtitleLabel.TextSize = 8
+	subtitleLabel.Font = Enum.Font.Gotham
+	subtitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+	subtitleLabel.ZIndex = 14
+	subtitleLabel.Parent = parent
+
+	local backButton = Instance.new("TextButton")
+	backButton.Name = "ExtensionBack"
+	backButton.Size = UDim2.fromOffset(72, 32)
+	backButton.Position = UDim2.new(1, -78, 0, 0)
+	backButton.BackgroundColor3 = COLORS.Card
+	backButton.BorderSizePixel = 0
+	backButton.Text = "‹  BACK"
+	backButton.TextColor3 = COLORS.White
+	backButton.TextSize = 9
+	backButton.Font = Enum.Font.GothamBold
+	backButton.AutoButtonColor = false
+	backButton.Active = true
+	backButton.Selectable = true
+	backButton.ZIndex = 15
+	backButton.Parent = parent
+
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 9)
+	corner.Parent = backButton
+
+	styleButton(backButton)
+
+	backButton.Activated:Connect(function()
+		showPage("Home")
+	end)
+end
+
+ExtensionCreateHeader(
+	ExtensionServerInfoPage,
+	"SERVER INFO",
+	"Live information about this Roblox session"
+)
+
+local function ExtensionCreateInfoCard(parent, y, title, initialValue)
+	local card = Instance.new("Frame")
+	card.Name = "Info_" .. title:gsub("%s+", "_")
+	card.Size = UDim2.new(1, -16, 0, 58)
+	card.Position = UDim2.fromOffset(8, y)
+	card.BackgroundColor3 = COLORS.Card
+	card.BorderSizePixel = 0
+	card.ZIndex = 12
+	card.Parent = parent
+
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 10)
+	corner.Parent = card
+
+	local stroke = Instance.new("UIStroke")
+	stroke.Color = COLORS.Stroke
+	stroke.Thickness = 1
+	stroke.Parent = card
+
+	local titleLabel = Instance.new("TextLabel")
+	titleLabel.BackgroundTransparency = 1
+	titleLabel.Position = UDim2.fromOffset(12, 7)
+	titleLabel.Size = UDim2.new(1, -24, 0, 18)
+	titleLabel.Text = title
+	titleLabel.TextColor3 = COLORS.White
+	titleLabel.TextSize = 10
+	titleLabel.Font = Enum.Font.GothamBold
+	titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+	titleLabel.ZIndex = 13
+	titleLabel.Parent = card
+
+	local valueLabel = Instance.new("TextLabel")
+	valueLabel.BackgroundTransparency = 1
+	valueLabel.Position = UDim2.fromOffset(12, 27)
+	valueLabel.Size = UDim2.new(1, -24, 0, 21)
+	valueLabel.Text = initialValue
+	valueLabel.TextColor3 = COLORS.Gray
+	valueLabel.TextSize = 8
+	valueLabel.Font = Enum.Font.Code
+	valueLabel.TextXAlignment = Enum.TextXAlignment.Left
+	valueLabel.TextTruncate = Enum.TextTruncate.AtEnd
+	valueLabel.ZIndex = 13
+	valueLabel.Parent = card
+
+	ExtensionServerInfo.Labels[title] = valueLabel
+
+	return card, valueLabel
+end
+
+ExtensionCreateInfoCard(ExtensionServerInfoPage, 52, "JOB ID", "Loading...")
+ExtensionCreateInfoCard(ExtensionServerInfoPage, 117, "PLACE ID", "Loading...")
+ExtensionCreateInfoCard(ExtensionServerInfoPage, 182, "PLAYER COUNT", "Loading...")
+ExtensionCreateInfoCard(ExtensionServerInfoPage, 247, "NPC COUNT", "Loading...")
+ExtensionCreateInfoCard(ExtensionServerInfoPage, 312, "SERVER TYPE", "Loading...")
+ExtensionCreateInfoCard(ExtensionServerInfoPage, 377, "UPTIME", "Loading...")
+
+local ExtensionServerRefresh = Instance.new("TextButton")
+ExtensionServerRefresh.Name = "RefreshServerInfo"
+ExtensionServerRefresh.Size = UDim2.new(1, -16, 0, 42)
+ExtensionServerRefresh.Position = UDim2.fromOffset(8, 442)
+ExtensionServerRefresh.BackgroundColor3 = COLORS.Card
+ExtensionServerRefresh.BorderSizePixel = 0
+ExtensionServerRefresh.Text = "REFRESH SERVER INFO"
+ExtensionServerRefresh.TextColor3 = COLORS.White
+ExtensionServerRefresh.TextSize = 9
+ExtensionServerRefresh.Font = Enum.Font.GothamBold
+ExtensionServerRefresh.AutoButtonColor = false
+ExtensionServerRefresh.Active = true
+ExtensionServerRefresh.Selectable = true
+ExtensionServerRefresh.ZIndex = 12
+ExtensionServerRefresh.Parent = ExtensionServerInfoPage
+
+local ExtensionRefreshCorner = Instance.new("UICorner")
+ExtensionRefreshCorner.CornerRadius = UDim.new(0, 9)
+ExtensionRefreshCorner.Parent = ExtensionServerRefresh
+styleButton(ExtensionServerRefresh)
+
+local ExtensionServerStatus = Instance.new("TextLabel")
+ExtensionServerStatus.Name = "ServerStatus"
+ExtensionServerStatus.BackgroundTransparency = 1
+ExtensionServerStatus.Position = UDim2.fromOffset(10, 492)
+ExtensionServerStatus.Size = UDim2.new(1, -20, 0, 40)
+ExtensionServerStatus.Text = "Waiting for first refresh..."
+ExtensionServerStatus.TextColor3 = COLORS.Gray
+ExtensionServerStatus.TextSize = 8
+ExtensionServerStatus.Font = Enum.Font.Gotham
+ExtensionServerStatus.TextXAlignment = Enum.TextXAlignment.Left
+ExtensionServerStatus.TextYAlignment = Enum.TextYAlignment.Top
+ExtensionServerStatus.ZIndex = 12
+ExtensionServerStatus.Parent = ExtensionServerInfoPage
+
+local function ExtensionCountNPCs()
+	local count = 0
+	local seen = {}
+
+	for _, object in ipairs(workspace:GetDescendants()) do
+		if object:IsA("Model") and not seen[object] then
+			local humanoid = object:FindFirstChildOfClass("Humanoid")
+
+			if humanoid and not Players:GetPlayerFromCharacter(object) then
+				seen[object] = true
+				count += 1
+			end
+		end
+	end
+
+	return count
+end
+
+local function ExtensionFormatUptime(seconds)
+	seconds = math.max(0, math.floor(seconds))
+
+	local hours = math.floor(seconds / 3600)
+	local minutes = math.floor((seconds % 3600) / 60)
+	local remaining = seconds % 60
+
+	return string.format("%02dh %02dm %02ds", hours, minutes, remaining)
+end
+
+local function ExtensionUpdateServerInfo()
+	if not ExtensionServerInfoPage.Parent then
+		return
+	end
+
+	local jobId = game.JobId
+	if jobId == "" then
+		jobId = "Studio / local session"
+	end
+
+	local maxPlayers = Players.MaxPlayers
+	local playerCount = #Players:GetPlayers()
+	local npcCount = ExtensionCountNPCs()
+	local serverType = RunService:IsStudio() and "STUDIO / LOCAL" or "LIVE SERVER"
+
+	ExtensionServerInfo.Labels["JOB ID"].Text = jobId
+	ExtensionServerInfo.Labels["PLACE ID"].Text = tostring(game.PlaceId)
+	ExtensionServerInfo.Labels["PLAYER COUNT"].Text = string.format("%d / %d players", playerCount, maxPlayers)
+	ExtensionServerInfo.Labels["NPC COUNT"].Text = string.format("%d NPC models", npcCount)
+	ExtensionServerInfo.Labels["SERVER TYPE"].Text = serverType
+	ExtensionServerInfo.Labels["UPTIME"].Text = ExtensionFormatUptime(os.clock() - ExtensionServerInfo.StartedAt)
+
+	ExtensionServerInfo.LastUpdate = os.clock()
+	ExtensionServerStatus.Text = "Live update enabled  •  Last update: " .. os.date("%H:%M:%S")
+end
+
+ExtensionServerRefresh.Activated:Connect(function()
+	ExtensionUpdateServerInfo()
+	ExtensionServerStatus.Text = "Manual refresh complete  •  " .. os.date("%H:%M:%S")
+end)
+
+ExtensionUpdateServerInfo()
+
+-- Add the new Home button only after the original menu is already alive.
+local ExtensionServerInfoButton = createCategoryButton(
+	HomePage,
+	UDim2.fromOffset(8, 327),
+	"SERVER INFO",
+	"JobId, PlaceId, players and NPC information",
+	"▣",
+	function()
+		showPage("ExtensionServerInfo")
+	end
+)
+
+--==================================================
+-- EXTENDED SETTINGS UI
+--==================================================
+
+local ExtensionSettingsStatus = Instance.new("TextLabel")
+ExtensionSettingsStatus.Name = "ExtensionSettingsStatus"
+ExtensionSettingsStatus.BackgroundTransparency = 1
+ExtensionSettingsStatus.Position = UDim2.fromOffset(10, 350)
+ExtensionSettingsStatus.Size = UDim2.new(1, -20, 0, 34)
+ExtensionSettingsStatus.Text = "Advanced settings are ready."
+ExtensionSettingsStatus.TextColor3 = COLORS.Gray
+ExtensionSettingsStatus.TextSize = 8
+ExtensionSettingsStatus.Font = Enum.Font.Gotham
+ExtensionSettingsStatus.TextXAlignment = Enum.TextXAlignment.Left
+ExtensionSettingsStatus.TextYAlignment = Enum.TextYAlignment.Top
+ExtensionSettingsStatus.ZIndex = 12
+ExtensionSettingsStatus.Parent = SettingsPage
+
+local function ExtensionCreateSection(parent, y, text)
+	local label = Instance.new("TextLabel")
+	label.BackgroundTransparency = 1
+	label.Position = UDim2.fromOffset(10, y)
+	label.Size = UDim2.new(1, -20, 0, 20)
+	label.Text = text
+	label.TextColor3 = COLORS.Pink
+	label.TextSize = 9
+	label.Font = Enum.Font.GothamBold
+	label.TextXAlignment = Enum.TextXAlignment.Left
+	label.ZIndex = 13
+	label.Parent = parent
+	return label
+end
+
+local function ExtensionCreateAction(parent, y, title, description, callback)
+	local button = Instance.new("TextButton")
+	button.Size = UDim2.new(1, -16, 0, 54)
+	button.Position = UDim2.fromOffset(8, y)
+	button.BackgroundColor3 = COLORS.Card
+	button.BorderSizePixel = 0
+	button.Text = ""
+	button.AutoButtonColor = false
+	button.Active = true
+	button.Selectable = true
+	button.ZIndex = 12
+	button.Parent = parent
+
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 10)
+	corner.Parent = button
+
+	local titleLabel = Instance.new("TextLabel")
+	titleLabel.BackgroundTransparency = 1
+	titleLabel.Position = UDim2.fromOffset(12, 7)
+	titleLabel.Size = UDim2.new(1, -24, 0, 18)
+	titleLabel.Text = title
+	titleLabel.TextColor3 = COLORS.White
+	titleLabel.TextSize = 10
+	titleLabel.Font = Enum.Font.GothamBold
+	titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+	titleLabel.ZIndex = 13
+	titleLabel.Parent = button
+
+	local descLabel = Instance.new("TextLabel")
+	descLabel.BackgroundTransparency = 1
+	descLabel.Position = UDim2.fromOffset(12, 27)
+	descLabel.Size = UDim2.new(1, -24, 0, 15)
+	descLabel.Text = description
+	descLabel.TextColor3 = COLORS.Gray
+	descLabel.TextSize = 7.5
+	descLabel.Font = Enum.Font.Gotham
+	descLabel.TextXAlignment = Enum.TextXAlignment.Left
+	descLabel.ZIndex = 13
+	descLabel.Parent = button
+
+	styleButton(button)
+	button.Activated:Connect(callback)
+
+	return button
+end
+
+local function ExtensionCreateValue(parent, y, title, description, values, initialIndex, callback)
+	local button = Instance.new("TextButton")
+	button.Size = UDim2.new(1, -16, 0, 58)
+	button.Position = UDim2.fromOffset(8, y)
+	button.BackgroundColor3 = COLORS.Card
+	button.BorderSizePixel = 0
+	button.Text = ""
+	button.AutoButtonColor = false
+	button.Active = true
+	button.Selectable = true
+	button.ZIndex = 12
+	button.Parent = parent
+
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 10)
+	corner.Parent = button
+
+	local titleLabel = Instance.new("TextLabel")
+	titleLabel.BackgroundTransparency = 1
+	titleLabel.Position = UDim2.fromOffset(12, 7)
+	titleLabel.Size = UDim2.new(0.58, 0, 0, 18)
+	titleLabel.Text = title
+	titleLabel.TextColor3 = COLORS.White
+	titleLabel.TextSize = 10
+	titleLabel.Font = Enum.Font.GothamBold
+	titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+	titleLabel.ZIndex = 13
+	titleLabel.Parent = button
+
+	local descLabel = Instance.new("TextLabel")
+	descLabel.BackgroundTransparency = 1
+	descLabel.Position = UDim2.fromOffset(12, 28)
+	descLabel.Size = UDim2.new(0.58, 0, 0, 15)
+	descLabel.Text = description
+	descLabel.TextColor3 = COLORS.Gray
+	descLabel.TextSize = 7
+	descLabel.Font = Enum.Font.Gotham
+	descLabel.TextXAlignment = Enum.TextXAlignment.Left
+	descLabel.ZIndex = 13
+	descLabel.Parent = button
+
+	local valueLabel = Instance.new("TextLabel")
+	valueLabel.BackgroundTransparency = 1
+	valueLabel.Position = UDim2.new(0.61, 0, 0, 18)
+	valueLabel.Size = UDim2.new(0.34, 0, 0, 22)
+	valueLabel.TextColor3 = COLORS.Pink
+	valueLabel.TextSize = 10
+	valueLabel.Font = Enum.Font.GothamBold
+	valueLabel.TextXAlignment = Enum.TextXAlignment.Right
+	valueLabel.ZIndex = 13
+	valueLabel.Parent = button
+
+	local index = math.clamp(initialIndex or 1, 1, #values)
+
+	local function refresh()
+		valueLabel.Text = tostring(values[index])
+	end
+
+	button.Activated:Connect(function()
+		index += 1
+		if index > #values then
+			index = 1
+		end
+
+		refresh()
+		callback(values[index])
+	end)
+
+	styleButton(button)
+	refresh()
+
+	return {
+		Button = button,
+		GetValue = function()
+			return values[index]
+		end,
+		SetValue = function(value)
+			for i, candidate in ipairs(values) do
+				if candidate == value then
+					index = i
+					refresh()
+					callback(candidate)
+					return
+				end
+			end
+		end,
+	}
+end
+
+ExtensionCreateSection(SettingsPage, 430, "SAVE / RESET")
+
+local ExtensionSavedSnapshot = nil
+
+local function ExtensionSaveSettings()
+	ExtensionSavedSnapshot = {
+		Combat = ExtensionDeepCopy(Settings),
+		Interface = ExtensionDeepCopy(ExtensionSettings),
+	}
+
+	ExtensionSettingsStatus.Text = "Settings saved locally  •  " .. os.date("%H:%M:%S")
+end
+
+local function ExtensionLoadSettings()
+	if not ExtensionSavedSnapshot then
+		ExtensionSettingsStatus.Text = "No saved settings exist in this session."
+		return
+	end
+
+	for key, value in pairs(ExtensionSavedSnapshot.Combat) do
+		Settings[key] = ExtensionDeepCopy(value)
+	end
+
+	for key, value in pairs(ExtensionSavedSnapshot.Interface) do
+		ExtensionSettings[key] = ExtensionDeepCopy(value)
+	end
+
+	ExtensionSettingsStatus.Text = "Saved settings restored  •  " .. os.date("%H:%M:%S")
+end
+
+ExtensionCreateAction(
+	SettingsPage,
+	455,
+	"SAVE SETTINGS",
+	"Save the current configuration for this running session",
+	ExtensionSaveSettings
+)
+
+ExtensionCreateAction(
+	SettingsPage,
+	518,
+	"LOAD SAVED SETTINGS",
+	"Restore the last local session snapshot",
+	ExtensionLoadSettings
+)
+
+ExtensionCreateSection(SettingsPage, 585, "UI APPEARANCE")
+
+local ExtensionTransparencyValue = ExtensionCreateValue(
+	SettingsPage,
+	610,
+	"UI TRANSPARENCY",
+	"Change panel transparency",
+	{"0%", "10%", "20%", "30%", "40%", "50%"},
+	1,
+	function(value)
+		local amount = tonumber(value:match("%d+")) or 0
+		ExtensionSettings.UITransparency = amount / 100
+	end
+)
+
+local ExtensionScaleValue = ExtensionCreateValue(
+	SettingsPage,
+	676,
+	"UI SCALE",
+	"Change overall panel size",
+	{"75%", "80%", "90%", "100%", "110%", "120%", "125%"},
+	4,
+	function(value)
+		local percent = tonumber(value:match("%d+")) or 100
+		ExtensionSettings.UIScale = percent / 100
+	end
+)
+
+local ExtensionThemeValue = ExtensionCreateValue(
+	SettingsPage,
+	742,
+	"THEME SELECTOR",
+	"Choose a visual theme",
+	{"Neon", "Cyber", "Mono"},
+	1,
+	function(value)
+		ExtensionSettings.Theme = value
+	end
+)
+
+local ExtensionPanelScale = Instance.new("UIScale")
+ExtensionPanelScale.Name = "ExtensionPanelScale"
+ExtensionPanelScale.Scale = 1
+ExtensionPanelScale.Parent = Main
+
+local ExtensionBaseTransparency = {}
+
+local function ExtensionRegisterTransparency(object)
+	if object and object:IsA("GuiObject") then
+		ExtensionBaseTransparency[object] = object.BackgroundTransparency
+	end
+end
+
+ExtensionRegisterTransparency(Main)
+ExtensionRegisterTransparency(Header)
+ExtensionRegisterTransparency(OpenButton)
+ExtensionRegisterTransparency(AdminBadge)
+ExtensionRegisterTransparency(Close)
+
+local function ExtensionApplyTransparency()
+	local amount = math.clamp(ExtensionSettings.UITransparency, 0, 0.6)
+
+	for object, base in pairs(ExtensionBaseTransparency) do
+		if object and object.Parent then
+			object.BackgroundTransparency = math.clamp(base + amount, 0, 1)
+		end
+	end
+end
+
+local function ExtensionApplyScale()
+	ExtensionPanelScale.Scale = math.clamp(ExtensionSettings.UIScale, 0.75, 1.25)
+end
+
+local function ExtensionSetTheme(themeName)
+	ExtensionSettings.Theme = themeName
+
+	if themeName == "Cyber" then
+		COLORS.Background = Color3.fromRGB(5, 10, 15)
+		COLORS.Panel = Color3.fromRGB(7, 17, 24)
+		COLORS.Panel2 = Color3.fromRGB(10, 24, 32)
+		COLORS.Card = Color3.fromRGB(12, 28, 36)
+		COLORS.CardHover = Color3.fromRGB(15, 42, 49)
+		COLORS.Stroke = Color3.fromRGB(35, 77, 86)
+		COLORS.Pink = Color3.fromRGB(50, 220, 210)
+		COLORS.PinkDark = Color3.fromRGB(25, 130, 125)
+		COLORS.White = Color3.fromRGB(235, 250, 250)
+		COLORS.Gray = Color3.fromRGB(135, 170, 174)
+		COLORS.Gray2 = Color3.fromRGB(70, 105, 110)
+	elseif themeName == "Mono" then
+		COLORS.Background = Color3.fromRGB(10, 10, 10)
+		COLORS.Panel = Color3.fromRGB(18, 18, 18)
+		COLORS.Panel2 = Color3.fromRGB(25, 25, 25)
+		COLORS.Card = Color3.fromRGB(32, 32, 32)
+		COLORS.CardHover = Color3.fromRGB(45, 45, 45)
+		COLORS.Stroke = Color3.fromRGB(72, 72, 72)
+		COLORS.Pink = Color3.fromRGB(225, 225, 225)
+		COLORS.PinkDark = Color3.fromRGB(150, 150, 150)
+		COLORS.White = Color3.fromRGB(245, 245, 245)
+		COLORS.Gray = Color3.fromRGB(165, 165, 165)
+		COLORS.Gray2 = Color3.fromRGB(105, 105, 105)
+	else
+		COLORS.Background = Color3.fromRGB(7, 8, 12)
+		COLORS.Panel = Color3.fromRGB(11, 12, 18)
+		COLORS.Panel2 = Color3.fromRGB(16, 17, 25)
+		COLORS.Card = Color3.fromRGB(18, 20, 29)
+		COLORS.CardHover = Color3.fromRGB(27, 22, 34)
+		COLORS.Stroke = Color3.fromRGB(45, 48, 62)
+		COLORS.Pink = Color3.fromRGB(255, 35, 115)
+		COLORS.PinkDark = Color3.fromRGB(170, 20, 75)
+		COLORS.White = Color3.fromRGB(245, 245, 250)
+		COLORS.Gray = Color3.fromRGB(150, 153, 165)
+		COLORS.Gray2 = Color3.fromRGB(95, 99, 112)
+	end
+
+	Main.BackgroundColor3 = COLORS.Background
+	Header.BackgroundColor3 = COLORS.Panel
+	OpenButton.BackgroundColor3 = COLORS.Panel
+	OpenButton.TextColor3 = COLORS.Pink
+	Close.TextColor3 = COLORS.Pink
+	Logo.TextColor3 = COLORS.Pink
+	Subtitle.TextColor3 = COLORS.Pink
+	MainStroke.Color = COLORS.Pink
+	OpenStroke.Color = COLORS.Pink
+	AimFOVStroke.Color = COLORS.Pink
+end
+
+ExtensionTransparencyValue.Button.Activated:Connect(ExtensionApplyTransparency)
+ExtensionScaleValue.Button.Activated:Connect(ExtensionApplyScale)
+ExtensionThemeValue.Button.Activated:Connect(function()
+	ExtensionSetTheme(ExtensionThemeValue.GetValue())
+end)
+
+ExtensionCreateSection(SettingsPage, 808, "KEYBIND MANAGER")
+
+local ExtensionPendingKeybind = nil
+local ExtensionKeybindButtons = {}
+
+local function ExtensionKeyName(key)
+	if not key then
+		return "UNBOUND"
+	end
+	return key.Name
+end
+
+local function ExtensionRefreshKeybindButtons()
+	for action, button in pairs(ExtensionKeybindButtons) do
+		if button and button.Parent then
+			button.Text = action .. "  •  " .. ExtensionKeyName(ExtensionSettings.Keybinds[action])
+		end
+	end
+end
+
+local function ExtensionCreateKeybind(y, action, description)
+	local button = Instance.new("TextButton")
+	button.Size = UDim2.new(1, -16, 0, 52)
+	button.Position = UDim2.fromOffset(8, y)
+	button.BackgroundColor3 = COLORS.Card
+	button.BorderSizePixel = 0
+	button.TextColor3 = COLORS.White
+	button.TextSize = 9
+	button.Font = Enum.Font.GothamBold
+	button.AutoButtonColor = false
+	button.Active = true
+	button.Selectable = true
+	button.ZIndex = 12
+	button.Parent = SettingsPage
+
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 10)
+	corner.Parent = button
+
+	local desc = Instance.new("TextLabel")
+	desc.BackgroundTransparency = 1
+	desc.Position = UDim2.fromOffset(12, 28)
+	desc.Size = UDim2.new(1, -24, 0, 15)
+	desc.Text = description
+	desc.TextColor3 = COLORS.Gray
+	desc.TextSize = 7
+	desc.Font = Enum.Font.Gotham
+	desc.TextXAlignment = Enum.TextXAlignment.Left
+	desc.ZIndex = 13
+	desc.Parent = button
+
+	styleButton(button)
+
+	ExtensionKeybindButtons[action] = button
+
+	button.Activated:Connect(function()
+		ExtensionPendingKeybind = action
+		button.Text = action .. "  •  PRESS A KEY..."
+	end)
+
+	return button
+end
+
+ExtensionCreateKeybind(833, "TogglePanel", "Toggle the main panel")
+ExtensionCreateKeybind(893, "PlayerAimbot", "Toggle player aimbot")
+ExtensionCreateKeybind(953, "NpcAimbot", "Toggle NPC aimbot")
+
+local ExtensionResetKeybinds = ExtensionCreateAction(
+	SettingsPage,
+	1013,
+	"RESET KEYBINDS",
+	"Restore RightShift and clear optional keybinds",
+	function()
+		ExtensionSettings.Keybinds.TogglePanel = Enum.KeyCode.RightShift
+		ExtensionSettings.Keybinds.PlayerAimbot = nil
+		ExtensionSettings.Keybinds.NpcAimbot = nil
+		ExtensionPendingKeybind = nil
+		ExtensionRefreshKeybindButtons()
+	end
+)
+
+UserInputService.InputBegan:Connect(function(input, processed)
+	if not ExtensionPendingKeybind then
+		return
+	end
+
+	if input.UserInputType ~= Enum.UserInputType.Keyboard then
+		return
+	end
+
+	if input.KeyCode == Enum.KeyCode.Unknown then
+		return
+	end
+
+	ExtensionSettings.Keybinds[ExtensionPendingKeybind] = input.KeyCode
+	ExtensionPendingKeybind = nil
+	ExtensionRefreshKeybindButtons()
+end)
+
+UserInputService.InputBegan:Connect(function(input, processed)
+	if processed or ExtensionPendingKeybind then
+		return
+	end
+
+	if input.UserInputType ~= Enum.UserInputType.Keyboard then
+		return
+	end
+
+	local key = input.KeyCode
+
+	if ExtensionSettings.Keybinds.TogglePanel == key then
+		if IsOpen then
+			closePanel()
+		else
+			openPanel()
+		end
+	end
+
+	if ExtensionSettings.Keybinds.PlayerAimbot == key then
+		Settings.PlayerAimbot = not Settings.PlayerAimbot
+	end
+
+	if ExtensionSettings.Keybinds.NpcAimbot == key then
+		Settings.NpcAimbot = not Settings.NpcAimbot
+	end
+end)
+
+ExtensionCreateSection(SettingsPage, 1082, "TAB VISIBILITY")
+
+local ExtensionTabButtons = {
+	Aim = nil,
+	Debug = nil,
+	Misc = nil,
+	Settings = nil,
+	ExtensionServerInfo = ExtensionServerInfoButton,
+}
+
+local function ExtensionFindHomeButton(title)
+	for _, child in ipairs(HomePage:GetChildren()) do
+		if child:IsA("TextButton") then
+			for _, nested in ipairs(child:GetChildren()) do
+				if nested:IsA("TextLabel") and nested.Text == title then
+					return child
+				end
+			end
+		end
+	end
+	return nil
+end
+
+ExtensionTabButtons.Aim = ExtensionFindHomeButton("AIM")
+ExtensionTabButtons.Debug = ExtensionFindHomeButton("DEBUG")
+ExtensionTabButtons.Misc = ExtensionFindHomeButton("MISC")
+ExtensionTabButtons.Settings = ExtensionFindHomeButton("SETTINGS")
+
+local function ExtensionRefreshTabs()
+	for tabName, button in pairs(ExtensionTabButtons) do
+		local visible = ExtensionSettings.TabVisibility[tabName]
+		if button and button.Parent then
+			button.Visible = visible ~= false
+		end
+	end
+end
+
+local function ExtensionCreateTabToggle(y, tabName, title)
+	local toggle = Instance.new("TextButton")
+	toggle.Size = UDim2.new(1, -16, 0, 46)
+	toggle.Position = UDim2.fromOffset(8, y)
+	toggle.BackgroundColor3 = COLORS.Card
+	toggle.BorderSizePixel = 0
+	toggle.Text = ""
+	toggle.AutoButtonColor = false
+	toggle.Active = true
+	toggle.Selectable = true
+	toggle.ZIndex = 12
+	toggle.Parent = SettingsPage
+
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 10)
+	corner.Parent = toggle
+
+	local label = Instance.new("TextLabel")
+	label.BackgroundTransparency = 1
+	label.Position = UDim2.fromOffset(12, 0)
+	label.Size = UDim2.new(0.7, 0, 1, 0)
+	label.Text = title
+	label.TextColor3 = COLORS.White
+	label.TextSize = 9
+	label.Font = Enum.Font.GothamBold
+	label.TextXAlignment = Enum.TextXAlignment.Left
+	label.ZIndex = 13
+	label.Parent = toggle
+
+	local state = Instance.new("TextLabel")
+	state.BackgroundTransparency = 1
+	state.Position = UDim2.new(0.7, 0, 0, 0)
+	state.Size = UDim2.new(0.25, 0, 1, 0)
+	state.TextColor3 = COLORS.Pink
+	state.TextSize = 9
+	state.Font = Enum.Font.GothamBold
+	state.TextXAlignment = Enum.TextXAlignment.Right
+	state.ZIndex = 13
+	state.Parent = toggle
+
+	local function refresh()
+		state.Text = ExtensionSettings.TabVisibility[tabName] and "VISIBLE" or "HIDDEN"
+	end
+
+	toggle.Activated:Connect(function()
+		ExtensionSettings.TabVisibility[tabName] = not ExtensionSettings.TabVisibility[tabName]
+		ExtensionRefreshTabs()
+		refresh()
+	end)
+
+	styleButton(toggle)
+	refresh()
+end
+
+ExtensionCreateTabToggle(1110, "Aim", "AIM TAB")
+ExtensionCreateTabToggle(1162, "Debug", "DEBUG TAB")
+ExtensionCreateTabToggle(1214, "Misc", "MISC TAB")
+ExtensionCreateTabToggle(1266, "ExtensionServerInfo", "SERVER INFO TAB")
+ExtensionCreateTabToggle(1318, "Settings", "SETTINGS TAB")
+
+ExtensionCreateSection(SettingsPage, 1372, "CONFIG PROFILES")
+
+local ExtensionProfiles = {
+	Combat = nil,
+	Debug = nil,
+	Testing = nil,
+}
+
+local ExtensionCurrentProfile = "Combat"
+
+local function ExtensionSnapshot()
+	return {
+		Combat = ExtensionDeepCopy(Settings),
+		Interface = ExtensionDeepCopy(ExtensionSettings),
+	}
+end
+
+ExtensionProfiles.Combat = ExtensionSnapshot()
+ExtensionProfiles.Debug = ExtensionSnapshot()
+ExtensionProfiles.Testing = ExtensionSnapshot()
+
+local ExtensionProfileValue = ExtensionCreateValue(
+	SettingsPage,
+	1398,
+	"PROFILE",
+	"Select Combat, Debug or Testing",
+	{"Combat", "Debug", "Testing"},
+	1,
+	function(value)
+		ExtensionCurrentProfile = value
+	end
+)
+
+ExtensionCreateAction(
+	SettingsPage,
+	1464,
+	"LOAD PROFILE",
+	"Load the selected configuration profile",
+	function()
+		local name = ExtensionProfileValue.GetValue()
+		local snapshot = ExtensionProfiles[name]
+
+		if not snapshot then
+			return
+		end
+
+		for key, value in pairs(snapshot.Combat) do
+			Settings[key] = ExtensionDeepCopy(value)
+		end
+
+		for key, value in pairs(snapshot.Interface) do
+			ExtensionSettings[key] = ExtensionDeepCopy(value)
+		end
+
+		ExtensionCurrentProfile = name
+		ExtensionApplyTransparency()
+		ExtensionApplyScale()
+		ExtensionRefreshKeybindButtons()
+		ExtensionRefreshTabs()
+		ExtensionSettingsStatus.Text = "Profile loaded: " .. name
+	end
+)
+
+ExtensionCreateAction(
+	SettingsPage,
+	1527,
+	"SAVE PROFILE",
+	"Save the current configuration into the selected profile",
+	function()
+		local name = ExtensionProfileValue.GetValue()
+		ExtensionProfiles[name] = ExtensionSnapshot()
+		ExtensionCurrentProfile = name
+		ExtensionSettingsStatus.Text = "Profile saved: " .. name
+	end
+)
+
+ExtensionCreateAction(
+	SettingsPage,
+	1590,
+	"RESET SETTINGS",
+	"Reset all extended interface options",
+	function()
+		ExtensionSettings = ExtensionDeepCopy(ExtensionDefaultSettings)
+		ExtensionTransparencyValue.SetValue("0%")
+		ExtensionScaleValue.SetValue("100%")
+		ExtensionThemeValue.SetValue("Neon")
+		ExtensionApplyTransparency()
+		ExtensionApplyScale()
+		ExtensionRefreshKeybindButtons()
+		ExtensionRefreshTabs()
+		ExtensionSettingsStatus.Text = "Extended settings reset."
+	end
+)
+
+local ExtensionSettingsInfo = Instance.new("TextLabel")
+ExtensionSettingsInfo.BackgroundTransparency = 1
+ExtensionSettingsInfo.Position = UDim2.fromOffset(10, 1654)
+ExtensionSettingsInfo.Size = UDim2.new(1, -20, 0, 80)
+ExtensionSettingsInfo.Text =
+	"SAVE SETTINGS stores a local session snapshot.\n"
+	.. "CONFIG PROFILES are local to this running client.\n"
+	.. "Permanent saving requires a server Script and DataStoreService."
+ExtensionSettingsInfo.TextColor3 = COLORS.Gray
+ExtensionSettingsInfo.TextSize = 8
+ExtensionSettingsInfo.Font = Enum.Font.Gotham
+ExtensionSettingsInfo.TextXAlignment = Enum.TextXAlignment.Left
+ExtensionSettingsInfo.TextYAlignment = Enum.TextYAlignment.Top
+ExtensionSettingsInfo.ZIndex = 12
+ExtensionSettingsInfo.Parent = SettingsPage
+
+-- Apply the extension defaults once, after every object has been created.
+ExtensionApplyTransparency()
+ExtensionApplyScale()
+ExtensionRefreshKeybindButtons()
+ExtensionRefreshTabs()
+
+-- Make sure the original page remains visible after adding extensions.
+Main.Visible = true
+IsOpen = true
+showPage("Home")
+
+
 --==================================================  
 -- CLEANUP  
 --==================================================  
