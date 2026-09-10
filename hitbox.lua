@@ -478,7 +478,6 @@ local HomePage = createPage("Home")
 local AimPage = createPage("Aim")  
 local DebugPage = createPage("Debug")  
 local MiscPage = createPage("Misc")  
-local SettingsPage = createPage("Settings")  
   
 --==================================================  
 -- BUTTON STYLE  
@@ -949,24 +948,14 @@ do
 	createCategoryButton(  
 		HomePage,  
 		UDim2.fromOffset(8, 258),  
-		"SETTINGS",  
-		"Panel and interface configuration",  
-		"☷",  
+		"SERVER INFO",  
+		"Place, server and player information",  
+		"▣",  
 		function()  
-			showPage("Settings")  
+			showPage("ServerInfo")  
 		end  
 	)  
 end  
-  
---==================================================  
--- EARLY MENU INITIALIZATION  
---==================================================  
--- Show the already-built menu before optional gameplay/debug systems run.  
--- This prevents a later runtime error from leaving the UI invisible.  
-Main.Visible = true  
-OpenButton.Visible = true  
-IsOpen = true  
-showPage("Home")  
   
 --==================================================  
 -- AIM HELPERS  
@@ -3662,134 +3651,69 @@ MiscInfoCorner.CornerRadius = UDim.new(0, 9)
 MiscInfoCorner.Parent = MiscInfo  
   
 --==================================================  
--- SETTINGS PAGE  
+-- SERVER INFO PAGE  
 --==================================================  
-  
+
+local ServerInfoPage = createPage("ServerInfo")  
+
 createPageHeader(  
-	SettingsPage,  
-	"SETTINGS",  
-	"Panel and interface configuration"  
+	ServerInfoPage,  
+	"SERVER INFO",  
+	"Current place, server and player information"  
 )  
-  
-createToggle(  
-	SettingsPage,  
-	52,  
-	"UI ANIMATIONS",  
-	"Enable page and button animations",  
-	function()  
-		return Settings.UIAnimations  
-	end,  
-	function(value)  
-		Settings.UIAnimations = value  
+
+local ServerInfoText = Instance.new("TextLabel")  
+ServerInfoText.BackgroundColor3 = COLORS.Panel2  
+ServerInfoText.BorderSizePixel = 0  
+ServerInfoText.Position = UDim2.fromOffset(8, 52)  
+ServerInfoText.Size = UDim2.new(1, -16, 0, 185)  
+ServerInfoText.Text = ""  
+ServerInfoText.TextColor3 = COLORS.White  
+ServerInfoText.TextSize = 9  
+ServerInfoText.Font = Enum.Font.Code  
+ServerInfoText.TextXAlignment = Enum.TextXAlignment.Left  
+ServerInfoText.TextYAlignment = Enum.TextYAlignment.Top  
+ServerInfoText.ZIndex = 12  
+ServerInfoText.Parent = ServerInfoPage  
+
+local ServerInfoCorner = Instance.new("UICorner")  
+ServerInfoCorner.CornerRadius = UDim.new(0, 10)  
+ServerInfoCorner.Parent = ServerInfoText  
+
+local ServerInfoPadding = Instance.new("UIPadding")  
+ServerInfoPadding.PaddingLeft = UDim.new(0, 12)  
+ServerInfoPadding.PaddingRight = UDim.new(0, 12)  
+ServerInfoPadding.PaddingTop = UDim.new(0, 12)  
+ServerInfoPadding.Parent = ServerInfoText  
+
+local function updateServerInfo()  
+	local playerCount = #Players:GetPlayers()  
+	local npcCount = 0  
+
+	for npc in pairs(NPCs) do  
+		if npc and npc.Parent then  
+			npcCount += 1  
+		end  
 	end  
-)  
-  
-local CompactToggle = createToggle(  
-	SettingsPage,  
-	111,  
-	"COMPACT UI",  
-	"Use a smaller panel on PC",  
-	function()  
-		return Settings.CompactUI  
-	end,  
-	function(value)  
-		Settings.CompactUI = value  
-		updatePanelSize()  
+
+	ServerInfoText.Text =  
+		"SERVER INFO\n\n"  
+		.. "JobId: " .. tostring(game.JobId) .. "\n"  
+		.. "PlaceId: " .. tostring(game.PlaceId) .. "\n"  
+		.. "Players: " .. tostring(playerCount) .. "\n"  
+		.. "NPCs: " .. tostring(npcCount)  
+end  
+
+updateServerInfo()  
+task.spawn(function()  
+	while ScreenGui.Parent do  
+		if ServerInfoPage.Visible then  
+			updateServerInfo()  
+		end  
+		task.wait(1)  
 	end  
-)  
-  
-local ResetPositionButton = Instance.new("TextButton")  
-ResetPositionButton.Size = UDim2.new(1, -16, 0, 42)  
-ResetPositionButton.Position = UDim2.fromOffset(8, 170)  
-ResetPositionButton.BackgroundColor3 = COLORS.Card  
-ResetPositionButton.BorderSizePixel = 0  
-ResetPositionButton.Text = "RESET UI POSITION"  
-ResetPositionButton.TextColor3 = COLORS.White  
-ResetPositionButton.TextSize = 9  
-ResetPositionButton.Font = Enum.Font.GothamBold  
-ResetPositionButton.AutoButtonColor = false  
-ResetPositionButton.Active = true  
-ResetPositionButton.Selectable = true  
-ResetPositionButton.ZIndex = 12  
-ResetPositionButton.Parent = SettingsPage  
-  
-local ResetPositionCorner = Instance.new("UICorner")  
-ResetPositionCorner.CornerRadius = UDim.new(0, 9)  
-ResetPositionCorner.Parent = ResetPositionButton  
-  
-styleButton(ResetPositionButton)  
-  
-ResetPositionButton.Activated:Connect(function()  
-	Main.AnchorPoint = Vector2.new(0.5, 0.5)  
-	Main.Position = UDim2.fromScale(0.5, 0.5)  
 end)  
-  
-local ResetSettingsButton = Instance.new("TextButton")  
-ResetSettingsButton.Size = UDim2.new(1, -16, 0, 42)  
-ResetSettingsButton.Position = UDim2.fromOffset(8, 221)  
-ResetSettingsButton.BackgroundColor3 = COLORS.Card  
-ResetSettingsButton.BorderSizePixel = 0  
-ResetSettingsButton.Text = "RESET ALL SETTINGS"  
-ResetSettingsButton.TextColor3 = COLORS.White  
-ResetSettingsButton.TextSize = 9  
-ResetSettingsButton.Font = Enum.Font.GothamBold  
-ResetSettingsButton.AutoButtonColor = false  
-ResetSettingsButton.Active = true  
-ResetSettingsButton.Selectable = true  
-ResetSettingsButton.ZIndex = 12  
-ResetSettingsButton.Parent = SettingsPage  
-  
-local ResetSettingsCorner = Instance.new("UICorner")  
-ResetSettingsCorner.CornerRadius = UDim.new(0, 9)  
-ResetSettingsCorner.Parent = ResetSettingsButton  
-  
-styleButton(ResetSettingsButton)  
-  
-ResetSettingsButton.Activated:Connect(function()  
-	for key, value in pairs(DEFAULT_SETTINGS) do  
-		Settings[key] = value  
-	end  
-  
-	CurrentTarget = nil  
-	CurrentNpcTarget = nil  
-  
-	updatePanelSize()  
-	refreshAimPart()  
-	refreshRange()  
-	refreshFOV()  
-	refreshSmooth()  
-  
-	if DebugOverlayToggle then  
-		DebugOverlayToggle.Refresh()  
-	end  
-  
-	if TargetDebugToggle then  
-		TargetDebugToggle.Refresh()  
-	end  
-  
-	if PerformanceDebugToggle then  
-		PerformanceDebugToggle.Refresh()  
-	end  
-  
-	CompactToggle.Refresh()  
-end)  
-  
-local SettingsInfo = Instance.new("TextLabel")  
-SettingsInfo.BackgroundTransparency = 1  
-SettingsInfo.Position = UDim2.fromOffset(10, 280)  
-SettingsInfo.Size = UDim2.new(1, -20, 0, 60)  
-SettingsInfo.Text =  
-	"Interface settings are local to this panel.\n"  
-	.. "Combat settings are reset with RESET ALL SETTINGS."  
-  
-SettingsInfo.TextColor3 = COLORS.Gray  
-SettingsInfo.TextSize = 8  
-SettingsInfo.Font = Enum.Font.Gotham  
-SettingsInfo.TextXAlignment = Enum.TextXAlignment.Left  
-SettingsInfo.TextYAlignment = Enum.TextYAlignment.Top  
-SettingsInfo.ZIndex = 12  
-SettingsInfo.Parent = SettingsPage  
-  
+
 --==================================================  
 -- DEBUG OVERLAY  
 --==================================================  
@@ -4396,9 +4320,10 @@ end)
 -- INITIALIZATION  
 --==================================================  
   
--- Menu was initialized early; these updates are non-critical.  
-pcall(updateDebugVisibility)  
-pcall(updateDebugInfo)  
+updateDebugVisibility()  
+updateDebugInfo()  
+  
+showPage("Home")  
   
 --==================================================  
 -- CLEANUP  
