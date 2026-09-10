@@ -159,24 +159,6 @@ local SelectedDebugObject = nil
 local RemoteList = {}  
 local SelectedRemoteIndex = 1  
   
-local SelectedToolName = nil  
-local ToolGiveRemote = nil  
-  
---==================================================  
--- TOOL GIVE REMOTE  
---==================================================  
-  
-task.spawn(function()  
-	local remote = ReplicatedStorage:WaitForChild(  
-		"AdminToolGive",  
-		10  
-	)  
-  
-	if remote and remote:IsA("RemoteEvent") then  
-		ToolGiveRemote = remote  
-	end  
-end)  
-  
 --==================================================  
 -- SCREEN GUI  
 --==================================================  
@@ -475,16 +457,15 @@ local function createPage(name)
 end  
   
 local HomePage = createPage("Home")  
-
--- MENU FIX: keep the main page visible from the moment the GUI is created.  
--- Other sections below must not be able to leave the menu blank.  
-HomePage.Visible = true  
-CurrentPage = HomePage  
-
 local AimPage = createPage("Aim")  
 local DebugPage = createPage("Debug")  
 local MiscPage = createPage("Misc")  
 local SettingsPage = createPage("Settings")  
+
+-- HOME IS THE SAFE INITIAL PAGE: make it visible before later optional/debug code runs.
+HomePage.Visible = true
+HomePage.Position = UDim2.fromScale(0, 0)
+CurrentPage = HomePage
   
 --==================================================  
 -- BUTTON STYLE  
@@ -578,20 +559,28 @@ end
 local function showPage(pageName)  
 	local newPage = Pages[pageName]  
   
-	if not newPage then  
-		return  
-	end  
-  
-	if CurrentPage == newPage then  
-		return  
+	if not newPage or not newPage.Parent then  
+		return false  
 	end  
   
 	local oldPage = CurrentPage  
-  
 	CurrentPage = newPage  
 	newPage.Visible = true  
-  
+	newPage.Position = UDim2.fromScale(0, 0)  
 	newPage.CanvasPosition = Vector2.new(0, 0)  
+  
+	-- Keep exactly one page visible. This also recovers if a previous tween  
+	-- or an interrupted initialization left a page in a bad state.  
+	for _, page in pairs(Pages) do  
+		if page ~= newPage then  
+			page.Visible = false  
+			page.Position = UDim2.fromScale(0, 0)  
+		end  
+	end  
+  
+	if oldPage == newPage then  
+		return true  
+	end  
   
 	if not Settings.UIAnimations then  
 		newPage.Position = UDim2.fromScale(0, 0)  
@@ -2665,168 +2654,6 @@ local function getToolText(player)
 	return table.concat(lines, "\n")  
 end  
   
-local function getSelectedPlayerTool(player)  
-	local tools = getPlayerTools(player)  
-  
-	if #tools == 0 then  
-		SelectedToolName = nil  
-		return nil  
-	end  
-  
-	if not SelectedToolName then  
-		SelectedToolName = tools[1].Name  
-	end  
-  
-	for _, entry in ipairs(tools) do  
-		if entry.Name == SelectedToolName then  
-			return entry.Tool  
-		end  
-	end  
-  
-	SelectedToolName = tools[1].Name  
-  
-	return tools[1].Tool  
-end  
-  
-local function cycleSelectedTool(player)  
-	local tools = getPlayerTools(player)  
-  
-	if #tools == 0 then  
-		SelectedToolName = nil  
-		return  
-	end  
-  
-	local currentIndex = 1  
-  
-	for index, entry in ipairs(tools) do  
-		if entry.Name == SelectedToolName then  
-			currentIndex = index  
-			break  
-		end  
-	end  
-  
-	currentIndex += 1  
-  
-	if currentIndex > #tools then  
-		currentIndex = 1  
-	end  
-  
-	SelectedToolName = tools[currentIndex].Name  
-end  
-  
-local function requestGiveSelectedTool()  
-	local player = getDebugPlayer()  
-	local tool = getSelectedPlayerTool(player)  
-  
-	if not player or not tool then  
-		addConsoleMessage("[TOOL GIVE] No tool selected.")  
-		return  
-	end  
-  
-	if not ToolGiveRemote then  
-		ToolGiveRemote =  
-			ReplicatedStorage:FindFirstChild("AdminToolGive")  
-	end  
-  
-	if not ToolGiveRemote or not ToolGiveRemote:IsA("RemoteEvent") then  
-		addConsoleMessage(  
-			"[TOOL GIVE] AdminToolGive RemoteEvent not found."  
-		)  
-		return  
-	end  
-  
-	ToolGiveRemote:FireServer(  
-		player,  
-		tool.Name  
-	)  
-  
-	addConsoleMessage(  
-		"[TOOL GIVE] Requested: "  
-			.. tool.Name  
-			.. " from "  
-			.. player.Name  
-	)  
-end  
-  
-local function showToolInspector()  
-	openDebugTool(  
-		"TOOL INSPECTOR",  
-		"Inspect and give player tools"  
-	)  
-  
-	local content = DebugToolContent  
-	local player = getDebugPlayer()  
-	local selectedTool = getSelectedPlayerTool(player)  
-  
-	createToolSection(content, 8, "SELECTED PLAYER")  
-  
-	createToolValue(  
-		content,  
-		29,  
-		"PLAYER",  
-		player and player.Name or "None",  
-		36  
-	)  
-  
-	createToolAction(  
-		content,  
-		73,  
-		"NEXT PLAYER",  
-		function()  
-			cycleDebugPlayer()  
-			SelectedToolName = nil  
-			showToolInspector()  
-		end  
-	)  
-  
-	createToolAction(  
-		content,  
-		117,  
-		"USE CURRENT AIM TARGET",  
-		function()  
-			selectAimbotTarget()  
-			SelectedToolName = nil  
-			showToolInspector()  
-		end  
-	)  
-  
-	createToolSection(content, 167, "AVAILABLE TOOLS")  
-  
-	createToolText(  
-		content,  
-		188,  
-		getToolText(player),  
-		150  
-	)  
-  
-	createToolValue(  
-		content,  
-		348,  
-		"SELECTED",  
-		selectedTool and selectedTool.Name or "None",  
-		36  
-	)  
-  
-	createToolAction(  
-		content,  
-		392,  
-		"NEXT TOOL",  
-		function()  
-			cycleSelectedTool(player)  
-			showToolInspector()  
-		end  
-	)  
-  
-	createToolAction(  
-		content,  
-		436,  
-		"GIVE SELECTED TOOL",  
-		function()  
-			requestGiveSelectedTool()  
-		end  
-	)  
-end  
-  
 --==================================================  
 -- REMOTE TEST PANEL  
 --==================================================  
@@ -3528,8 +3355,13 @@ createDebugToolButton(
 	DebugPage,  
 	601,  
 	"TOOL INSPECTOR",  
-	"Inspect and give player tools",  
-	showToolInspector  
+	"Inspect tools owned by the selected player",  
+	function()  
+		openDebugTool("TOOL INSPECTOR", "Inspect player tools")  
+		local player = getDebugPlayer()  
+		createToolSection(DebugToolContent, 8, "PLAYER TOOLS")  
+		createToolText(DebugToolContent, 30, getToolText(player), 250)  
+	end  
 )  
   
 createDebugToolButton(  
@@ -4392,14 +4224,12 @@ end)
 -- INITIALIZATION  
 --==================================================  
   
-updateDebugVisibility()  
-updateDebugInfo()  
-
--- MENU FIX: final safety restore for the initial page.  
-Main.Visible = true  
-IsOpen = true  
-HomePage.Visible = true  
-CurrentPage = HomePage  
+-- Final UI initialization. The menu itself is initialized independently from debug data.
+Main.Visible = true
+HomePage.Visible = true
+showPage("Home")  
+pcall(updateDebugVisibility)
+pcall(updateDebugInfo)
   
 --==================================================  
 -- CLEANUP  
@@ -4417,12 +4247,4 @@ ScreenGui.Destroying:Connect(function()
 			connection:Disconnect()  
 		end  
 	end  
-end) 
-	local delta =  
-		input.Position - dragStart  
-  
-	Main.Position = UDim2.new(  
-		startPosition.X.Scale,  
-		startPosition.X.Offset + delta.X,  
-		startPosition.Y.Scale,  
-		startPosition.Y.Offset + delta.Y
+end)
