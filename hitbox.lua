@@ -475,6 +475,12 @@ local function createPage(name)
 end  
   
 local HomePage = createPage("Home")  
+
+-- MENU FIX: keep the main page visible from the moment the GUI is created.  
+-- Other sections below must not be able to leave the menu blank.  
+HomePage.Visible = true  
+CurrentPage = HomePage  
+
 local AimPage = createPage("Aim")  
 local DebugPage = createPage("Debug")  
 local MiscPage = createPage("Misc")  
@@ -956,11 +962,6 @@ do
 			showPage("Settings")  
 		end  
 	)  
-
-	-- Show the Home page immediately after it is constructed.
-	-- This keeps the menu usable even if a later debug/tool section fails.
-	HomePage.Visible = true
-	CurrentPage = HomePage
 end  
   
 --==================================================  
@@ -4393,8 +4394,12 @@ end)
   
 updateDebugVisibility()  
 updateDebugInfo()  
-  
-showPage("Home")  
+
+-- MENU FIX: final safety restore for the initial page.  
+Main.Visible = true  
+IsOpen = true  
+HomePage.Visible = true  
+CurrentPage = HomePage  
   
 --==================================================  
 -- CLEANUP  
@@ -4412,11 +4417,7 @@ ScreenGui.Destroying:Connect(function()
 			connection:Disconnect()  
 		end  
 	end  
-end)putType ~= Enum.UserInputType.MouseMovement  
-		and input.UserInputType ~= Enum.UserInputType.Touch then  
-		return  
-	end  
-  
+end) 
 	local delta =  
 		input.Position - dragStart  
   
@@ -4424,6 +4425,4 @@ end)putType ~= Enum.UserInputType.MouseMovement
 		startPosition.X.Scale,  
 		startPosition.X.Offset + delta.X,  
 		startPosition.Y.Scale,  
-		startPosition.Y.Offset + delta.Y  
-	)  
-end)
+		startPosition.Y.Offset + delta.Y
