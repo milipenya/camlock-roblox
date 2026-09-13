@@ -1,0 +1,132 @@
+-- PenyaHubZ v1.0 (Safe Mode for Ink Game)
+local ScreenGui = Instance.new("ScreenGui")
+local MainFrame = Instance.new("Frame")
+local Title = Instance.new("TextLabel")
+local PlayerESPBtn = Instance.new("TextButton")
+local GlassBridgeBtn = Instance.new("TextButton")
+local StatusLabel = Instance.new("TextLabel")
+
+ScreenGui.Parent = game:GetService("CoreGui")
+ScreenGui.Name = "PenyaHubZ"
+
+-- Настройка главного окна
+MainFrame.Parent = ScreenGui
+MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+MainFrame.BorderSizePixel = 2
+MainFrame.BorderColor3 = Color3.fromRGB(0, 180, 255) -- Синий неоновый контур
+MainFrame.Position = UDim2.new(0.15, 0, 0.25, 0)
+MainFrame.Size = UDim2.new(0, 240, 0, 180)
+MainFrame.Active = true
+MainFrame.Draggable = true
+
+-- Заголовок хаба
+Title.Parent = MainFrame
+Title.Size = UDim2.new(1, 0, 0.22, 0)
+Title.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+Title.Text = "⚡ PenyaHubZ v1.0 ⚡"
+Title.TextColor3 = Color3.fromRGB(0, 180, 255)
+Title.TextSize = 16
+Title.Font = Enum.Font.SourceSansBold
+
+-- Кнопка 1: Player ESP
+PlayerESPBtn.Parent = MainFrame
+PlayerESPBtn.Position = UDim2.new(0.1, 0, 0.3, 0)
+PlayerESPBtn.Size = UDim2.new(0.8, 0, 0.22, 0)
+PlayerESPBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+PlayerESPBtn.Text = "Player ESP: OFF"
+PlayerESPBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+PlayerESPBtn.TextSize = 14
+
+-- Кнопка 2: Glass Bridge ESP
+GlassBridgeBtn.Parent = MainFrame
+GlassBridgeBtn.Position = UDim2.new(0.1, 0, 0.58, 0)
+GlassBridgeBtn.Size = UDim2.new(0.8, 0, 0.22, 0)
+GlassBridgeBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+GlassBridgeBtn.Text = "Glass Bridge ESP: OFF"
+GlassBridgeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+GlassBridgeBtn.TextSize = 14
+
+-- Строка статуса
+StatusLabel.Parent = MainFrame
+StatusLabel.Position = UDim2.new(0, 0, 0.85, 0)
+StatusLabel.Size = UDim2.new(1, 0, 0.15, 0)
+StatusLabel.BackgroundTransparency = 1
+StatusLabel.Text = "Welcome to PenyaHubZ"
+StatusLabel.TextColor3 = Color3.fromRGB(120, 120, 130)
+StatusLabel.TextSize = 12
+
+-- Логика функций
+local EspActive = false
+local GlassActive = false
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+-- Функция для Player ESP (создает легальную подсветку Highlight)
+local function TogglePlayerESP()
+    EspActive = not EspActive
+    if EspActive then
+        PlayerESPBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
+        PlayerESPBtn.Text = "Player ESP: ON"
+        StatusLabel.Text = "Players highlighted!"
+        
+        -- Подсвечиваем всех игроков на твоем экране
+        for _, p in pairs(Players:GetPlayers()) do
+            if p ~= LocalPlayer and p.Character then
+                if not p.Character:FindFirstChild("PenyaESP") then
+                    local hl = Instance.new("Highlight")
+                    hl.Name = "PenyaESP"
+                    hl.Parent = p.Character
+                    hl.FillColor = Color3.fromRGB(0, 180, 255)
+                    hl.FillTransparency = 0.5
+                    hl.OutlineColor = Color3.fromRGB(255, 255, 255)
+                end
+            end
+        end
+    else
+        PlayerESPBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+        PlayerESPBtn.Text = "Player ESP: OFF"
+        -- Удаляем подсветку
+        for _, p in pairs(Players:GetPlayers()) do
+            if p.Character and p.Character:FindFirstChild("PenyaESP") then
+                p.Character.PenyaESP:Destroy()
+            end
+        end
+    end
+end
+
+-- Функция для Glass Bridge ESP (Ищет правильные стекла по названию/тегам в Ink Game)
+local function ToggleGlassESP()
+    GlassActive = not GlassActive
+    if GlassActive then
+        GlassBridgeBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
+        GlassBridgeBtn.Text = "Glass Bridge ESP: ON"
+        StatusLabel.Text = "Scanning bridge..."
+        
+        -- Сканируем карту на наличие стеклянных плит
+        -- Большинство Squid Game режимов называют правильные стекла "Real" или "Safe"
+        for _, v in pairs(workspace:GetDescendants()) do
+            if v:IsA("BasePart") and (v.Name:lower():match("real") or v.Name:lower():match("safe") or v.Name:lower():match("correct")) then
+                local box = Instance.new("BoxHandleAdornment")
+                box.Name = "PenyaGlass"
+                box.Size = v.Size + Vector3.new(0.1, 0.1, 0.1)
+                box.AlwaysOnTop = true
+                box.ZIndex = 5
+                box.Color3 = Color3.fromRGB(0, 255, 100) -- Зеленый цвет для правильного стекла
+                box.Adornee = v
+                box.Parent = v
+            end
+        end
+    else
+        GlassBridgeBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+        GlassBridgeBtn.Text = "Glass Bridge ESP: OFF"
+        -- Удаляем подсветку стекол
+        for _, v in pairs(workspace:GetDescendants()) do
+            if v:FindFirstChild("PenyaGlass") then
+                v.PenyaGlass:Destroy()
+            end
+        end
+    end
+end
+
+PlayerESPBtn.MouseButton1Click:Connect(TogglePlayerESP)
+GlassBridgeBtn.MouseButton1Click:Connect(ToggleGlassESP)
