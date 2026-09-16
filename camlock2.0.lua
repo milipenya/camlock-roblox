@@ -5,12 +5,12 @@ local ToggleBtn = Instance.new("TextButton")
 local StatusLabel = Instance.new("TextLabel")
 
 ScreenGui.Parent = game:GetService("CoreGui")
-ScreenGui.Name = "PenyaHardLockHub"
+ScreenGui.Name = "PenyaScriptableLock"
 
 MainFrame.Parent = ScreenGui
 MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
 MainFrame.BorderSizePixel = 1
-MainFrame.BorderColor3 = Color3.fromRGB(0, 255, 150) -- Зеленый неоновый контур
+MainFrame.BorderColor3 = Color3.fromRGB(0, 180, 255)
 MainFrame.Position = UDim2.new(0.1, 0, 0.3, 0)
 MainFrame.Size = UDim2.new(0, 220, 0, 130)
 MainFrame.Active = true
@@ -18,9 +18,9 @@ MainFrame.Draggable = true
 
 Title.Parent = MainFrame
 Title.Size = UDim2.new(1, 0, 0.3, 0)
-Title.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
-Title.Text = "🔒 Penya Camlock v2"
-Title.TextColor3 = Color3.fromRGB(0, 255, 150)
+Title.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+Title.Text = "🔒 Penya Camlock v3"
+Title.TextColor3 = Color3.fromRGB(0, 180, 255)
 Title.TextSize = 15
 Title.Font = Enum.Font.SourceSansBold
 
@@ -49,14 +49,13 @@ local CamlockActive = false
 local TargetPlayer = nil
 local CamLoop = nil
 
--- Запоминаем оригинальные настройки скрытия персонажа
-local OriginalDevMode = LocalPlayer.DevCameraOcclusionMode
+-- Расстояние камеры от твоего персонажа (высота и отдаление сзади)
+local CameraOffset = Vector3.new(0, 2.5, 8) 
 
 local function GetClosestPlayer()
     local closest = nil
     local shortestDistance = math.huge
     local camera = Workspace.CurrentCamera
-    
     if not camera then return nil end
 
     for _, player in pairs(Players:GetPlayers()) do
@@ -90,31 +89,32 @@ ToggleBtn.MouseButton1Click:Connect(function()
             ToggleBtn.Text = "CAMLOCK: ON"
             StatusLabel.Text = "Locked on: " .. TargetPlayer.Name
             
-            -- ФИКС ИСЧЕЗНОВЕНИЯ: Переключаем режим скрытия на "Invisicam" или полностью отключаем
-            LocalPlayer.DevCameraOcclusionMode = Enum.DevCameraOcclusionMode.Invisicam
+            -- Врубаем ручной режим управления камерой, отключая стандартную физику Roblox
+            camera.CameraType = Enum.CameraType.Scriptable
             
             CamLoop = RunService.RenderStepped:Connect(function()
                 if not CamlockActive or not camera then return end
                 
-                -- Принудительно заставляем камеру держать тип Custom, чтобы игра её не сбрасывала
-                camera.CameraType = Enum.CameraType.Custom
+                local myChar = LocalPlayer.Character
+                local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
                 
-                if TargetPlayer and TargetPlayer.Character and TargetPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                if myHRP and TargetPlayer and TargetPlayer.Character and TargetPlayer.Character:FindFirstChild("HumanoidRootPart") then
                     local targetHRP = TargetPlayer.Character.HumanoidRootPart
                     local targetHum = TargetPlayer.Character:FindFirstChildOfClass("Humanoid")
                     
-                    -- Защита от невидимости: если части твоего тела стали прозрачными из-за зума, возвращаем их
-                    if LocalPlayer.Character then
-                        for _, part in pairs(LocalPlayer.Character:GetChildren()) do
-                            if part:IsA("BasePart") and part.Transparency > 0 then
-                                part.Transparency = 0 -- Всегда держим скин видимым
-                            end
-                        end
-                    end
-                    
                     if targetHum and targetHum.Health > 0 then
-                        -- Жесткий фокус CFrame в шею цели
-                        camera.CFrame = CFrame.new(camera.CFrame.Position, targetHRP.Position + Vector3.new(0, 1.5, 0))
+                        -- 1. Считаем направление от тебя к противнику (только по горизонтали, чтобы камеру не кренило)
+                        local lookVector = (targetHRP.Position - myHRP.Position).Unit
+                        
+                        -- 2. Жестко позиционируем камеру строго за спиной твоего персонажа относительно врага
+                        -- Твой персонаж гарантированно останется в самом центре экрана
+                        local camPosition = myHRP.Position - (lookVector * CameraOffset.Z) + Vector3.new(0, CameraOffset.Y, 0)
+                        
+                        -- 3. Мгновенно перезаписываем CFrame камеры, направляя её из рассчитанной точки прямо в шею цели
+                        camera.CFrame = CFrame.new(camPosition, targetHRP.Position + Vector3.new(0, 1.5, 0))
+                        
+                        -- 4. Принудительно разворачиваем твоего персонажа лицом к цели, чтобы деши шли в правильном направлении
+                        myHRP.CFrame = CFrame.new(myHRP.Position, Vector3.new(targetHRP.Position.X, myHRP.Position.Y, targetHRP.Position.Z))
                     else
                         TargetPlayer = GetClosestPlayer()
                     end
@@ -131,13 +131,15 @@ ToggleBtn.MouseButton1Click:Connect(function()
         ToggleBtn.Text = "CAMLOCK: OFF"
         StatusLabel.Text = "Target: None"
         
-        -- Возвращаем стандартные настройки Roblox
-        LocalPlayer.DevCameraOcclusionMode = OriginalDevMode
-        
         if CamLoop then
             CamLoop:Disconnect()
             CamLoop = nil
         end
         TargetPlayer = nil
+        
+        -- Возвращаем управление камере обратно игроку
+        if camera then
+            camera.CameraType = Enum.CameraType.Custom
+        end
     end
 end)
