@@ -5,12 +5,12 @@ local ToggleBtn = Instance.new("TextButton")
 local StatusLabel = Instance.new("TextLabel")
 
 ScreenGui.Parent = game:GetService("CoreGui")
-ScreenGui.Name = "PenyaCamlockHub"
+ScreenGui.Name = "PenyaHardLockHub"
 
 MainFrame.Parent = ScreenGui
-MainFrame.BackgroundColor3 = Color3.fromRGB(25, 20, 30)
+MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
 MainFrame.BorderSizePixel = 1
-MainFrame.BorderColor3 = Color3.fromRGB(255, 0, 100) -- Ярко-розовый неоновый контур
+MainFrame.BorderColor3 = Color3.fromRGB(0, 255, 150) -- Зеленый неоновый контур
 MainFrame.Position = UDim2.new(0.1, 0, 0.3, 0)
 MainFrame.Size = UDim2.new(0, 220, 0, 130)
 MainFrame.Active = true
@@ -18,9 +18,9 @@ MainFrame.Draggable = true
 
 Title.Parent = MainFrame
 Title.Size = UDim2.new(1, 0, 0.3, 0)
-Title.BackgroundColor3 = Color3.fromRGB(40, 30, 45)
-Title.Text = "🔒 Penya Camlock (Hard)"
-Title.TextColor3 = Color3.fromRGB(255, 0, 100)
+Title.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+Title.Text = "🔒 Penya Camlock v2"
+Title.TextColor3 = Color3.fromRGB(0, 255, 150)
 Title.TextSize = 15
 Title.Font = Enum.Font.SourceSansBold
 
@@ -49,7 +49,9 @@ local CamlockActive = false
 local TargetPlayer = nil
 local CamLoop = nil
 
--- Функция поиска ближайшего живого игрока к твоему прицелу
+-- Запоминаем оригинальные настройки скрытия персонажа
+local OriginalDevMode = LocalPlayer.DevCameraOcclusionMode
+
 local function GetClosestPlayer()
     local closest = nil
     local shortestDistance = math.huge
@@ -61,7 +63,6 @@ local function GetClosestPlayer()
         if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
             local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
             if humanoid and humanoid.Health > 0 then
-                -- Считаем дистанцию на экране от центра до персонажа
                 local pos, onScreen = camera:WorldToViewportPoint(player.Character.HumanoidRootPart.Position)
                 if onScreen then
                     local mousePos = camera.ViewportSize / 2
@@ -79,6 +80,7 @@ end
 
 ToggleBtn.MouseButton1Click:Connect(function()
     CamlockActive = not CamlockActive
+    local camera = Workspace.CurrentCamera
     
     if CamlockActive then
         TargetPlayer = GetClosestPlayer()
@@ -88,23 +90,32 @@ ToggleBtn.MouseButton1Click:Connect(function()
             ToggleBtn.Text = "CAMLOCK: ON"
             StatusLabel.Text = "Locked on: " .. TargetPlayer.Name
             
-            local camera = Workspace.CurrentCamera
+            -- ФИКС ИСЧЕЗНОВЕНИЯ: Переключаем режим скрытия на "Invisicam" или полностью отключаем
+            LocalPlayer.DevCameraOcclusionMode = Enum.DevCameraOcclusionMode.Invisicam
             
-            -- НАМЕРТВЫЙ ЦИКЛ ПРИВЯЗКИ КАМЕРЫ (Без Lerp и сглаживания)
             CamLoop = RunService.RenderStepped:Connect(function()
                 if not CamlockActive or not camera then return end
                 
-                -- Проверяем, жив ли противник и существует ли его хитбокс
+                -- Принудительно заставляем камеру держать тип Custom, чтобы игра её не сбрасывала
+                camera.CameraType = Enum.CameraType.Custom
+                
                 if TargetPlayer and TargetPlayer.Character and TargetPlayer.Character:FindFirstChild("HumanoidRootPart") then
                     local targetHRP = TargetPlayer.Character.HumanoidRootPart
                     local targetHum = TargetPlayer.Character:FindFirstChildOfClass("Humanoid")
                     
+                    -- Защита от невидимости: если части твоего тела стали прозрачными из-за зума, возвращаем их
+                    if LocalPlayer.Character then
+                        for _, part in pairs(LocalPlayer.Character:GetChildren()) do
+                            if part:IsA("BasePart") and part.Transparency > 0 then
+                                part.Transparency = 0 -- Всегда держим скин видимым
+                            end
+                        end
+                    end
+                    
                     if targetHum and targetHum.Health > 0 then
-                        -- Жестко перезаписываем CFrame камеры, направляя её из текущей позиции глаза в хитбокс цели
-                        -- Смещение Vector3.new(0, 1.5, 0) направляет камеру ровно в голову/шею, а не в пояс
+                        -- Жесткий фокус CFrame в шею цели
                         camera.CFrame = CFrame.new(camera.CFrame.Position, targetHRP.Position + Vector3.new(0, 1.5, 0))
                     else
-                        -- Если цель погибла, ищем новую автоматически
                         TargetPlayer = GetClosestPlayer()
                     end
                 else
@@ -116,10 +127,12 @@ ToggleBtn.MouseButton1Click:Connect(function()
             StatusLabel.Text = "No players on screen!"
         end
     else
-        -- ПОЛНОЕ ОТКЛЮЧЕНИЕ И ОСВОБОЖДЕНИЕ КАМЕРЫ
         ToggleBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
         ToggleBtn.Text = "CAMLOCK: OFF"
         StatusLabel.Text = "Target: None"
+        
+        -- Возвращаем стандартные настройки Roblox
+        LocalPlayer.DevCameraOcclusionMode = OriginalDevMode
         
         if CamLoop then
             CamLoop:Disconnect()
