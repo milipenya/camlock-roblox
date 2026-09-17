@@ -7,8 +7,11 @@ local ToggleMenuBtn = Instance.new("TextButton")
 
 local TabBtn1 = Instance.new("TextButton")
 local Content1 = Instance.new("ScrollingFrame")
-local RLGLToggle = Instance.new("TextButton")
-local RLGLStatus = Instance.new("TextLabel")
+
+-- Buttons for features
+local DodgeToggle = Instance.new("TextButton")
+local GlassToggle = Instance.new("TextButton")
+local HoneyToggle = Instance.new("TextButton")
 
 if game:GetService("CoreGui"):FindFirstChild("PenyaHubZ") then
     game:GetService("CoreGui").PenyaHubZ:Destroy()
@@ -18,14 +21,20 @@ ScreenGui.Parent = game:GetService("CoreGui")
 ScreenGui.ResetOnSpawn = false
 
 local MenuOpen = true
-local RLGLEnabled = false
+local DodgeEnabled = false
+local GlassEnabled = false
+local HoneyEnabled = false
+
+local KNIFE_RANGE = 5.2
+local isDodging = false
+local isClickingHoney = false
 
 MainFrame.Name = "MainFrame"
 MainFrame.Parent = ScreenGui
 MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 MainFrame.BorderSizePixel = 0
 MainFrame.Position = UDim2.new(0.1, 0, 0.25, 0)
-MainFrame.Size = UDim2.new(0, 360, 0, 220)
+MainFrame.Size = UDim2.new(0, 380, 0, 260)
 MainFrame.Active = true
 MainFrame.Draggable = true
 
@@ -34,7 +43,7 @@ Title.Parent = MainFrame
 Title.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 Title.Size = UDim2.new(1, 0, 0, 30)
 Title.Font = Enum.Font.SourceSansBold
-Title.Text = "  PenyaHubZ v0.1"
+Title.Text = "  PenyaHubZ v0.2 | Advanced Edition"
 Title.TextColor3 = Color3.fromRGB(255, 215, 0)
 Title.TextSize = 16
 Title.TextXAlignment = Enum.TextXAlignment.Left
@@ -54,115 +63,193 @@ LeftPanel.Parent = MainFrame
 LeftPanel.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 LeftPanel.BorderSizePixel = 0
 LeftPanel.Position = UDim2.new(0, 0, 0, 30)
-LeftPanel.Size = UDim2.new(0, 100, 1, -30)
+LeftPanel.Size = UDim2.new(0, 110, 1, -30)
 
 RightPanel.Name = "RightPanel"
 RightPanel.Parent = MainFrame
 RightPanel.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
 RightPanel.BorderSizePixel = 0
-RightPanel.Position = UDim2.new(0, 100, 0, 30)
-RightPanel.Size = UDim2.new(1, -100, 1, -30)
+RightPanel.Position = UDim2.new(0, 110, 0, 30)
+RightPanel.Size = UDim2.new(1, -110, 1, -30)
 
 TabBtn1.Name = "TabBtn1"
 TabBtn1.Parent = LeftPanel
 TabBtn1.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 TabBtn1.BorderSizePixel = 0
-TabBtn1.Position = UDim2.new(0, 0, 0, 0)
-TabBtn1.Size = UDim2.new(1, 0, 0, 35)
+TabBtn1.Size = UDim2.new(1, 0, 0, 40)
 TabBtn1.Font = Enum.Font.SourceSansBold
 TabBtn1.Text = "MINI GAMES"
 TabBtn1.TextColor3 = Color3.fromRGB(255, 255, 255)
-TabBtn1.TextSize = 12
+TabBtn1.TextSize = 13
 
 Content1.Name = "Content1"
 Content1.Parent = RightPanel
 Content1.BackgroundTransparency = 1
 Content1.Size = UDim2.new(1, 0, 1, 0)
-Content1.CanvasSize = UDim2.new(0, 0, 1, 50)
+Content1.CanvasSize = UDim2.new(0, 0, 1, 100)
 Content1.ScrollBarThickness = 4
 
-RLGLToggle.Name = "RLGLToggle"
-RLGLToggle.Parent = Content1
-RLGLToggle.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-RLGLToggle.Position = UDim2.new(0.05, 0, 0.05, 0)
-RLGLToggle.Size = UDim2.new(0, 230, 0, 35)
-RLGLToggle.Font = Enum.Font.SourceSansBold
-RLGLToggle.Text = "RLGL Auto-Freeze: OFF"
-RLGLToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
-RLGLToggle.TextSize = 14
+-- UI: Smart Dodge Button
+DodgeToggle.Name = "DodgeToggle"
+DodgeToggle.Parent = Content1
+DodgeToggle.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+DodgeToggle.Position = UDim2.new(0.05, 0, 0.05, 0)
+DodgeToggle.Size = UDim2.new(0, 240, 0, 35)
+DodgeToggle.Font = Enum.Font.SourceSansBold
+DodgeToggle.Text = "Smart Knife Dodge: OFF"
+DodgeToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+DodgeToggle.TextSize = 14
 
-RLGLStatus.Name = "RLGLStatus"
-RLGLStatus.Parent = Content1
-RLGLStatus.BackgroundTransparency = 1
-RLGLStatus.Position = UDim2.new(0.05, 0, 0.25, 0)
-RLGLStatus.Size = UDim2.new(0, 230, 0, 20)
-RLGLStatus.Font = Enum.Font.SourceSans
-RLGLStatus.Text = "Doll State: Monitoring inactive"
-RLGLStatus.TextColor3 = Color3.fromRGB(150, 150, 150)
-RLGLStatus.TextSize = 12
-RLGLStatus.TextXAlignment = Enum.TextXAlignment.Left
+-- UI: Glass Bridge Button
+GlassToggle.Name = "GlassToggle"
+GlassToggle.Parent = Content1
+GlassToggle.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+GlassToggle.Position = UDim2.new(0.05, 0, 0.25, 0)
+GlassToggle.Size = UDim2.new(0, 240, 0, 35)
+GlassToggle.Font = Enum.Font.SourceSansBold
+GlassToggle.Text = "Glass Bridge ESP: OFF"
+GlassToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+GlassToggle.TextSize = 14
 
+-- UI: Honeycomb Button
+HoneyToggle.Name = "HoneyToggle"
+HoneyToggle.Parent = Content1
+HoneyToggle.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+HoneyToggle.Position = UDim2.new(0.05, 0, 0.45, 0)
+HoneyToggle.Size = UDim2.new(0, 240, 0, 35)
+HoneyToggle.Font = Enum.Font.SourceSansBold
+HoneyToggle.Text = "Honeycomb Clicker: OFF"
+HoneyToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+HoneyToggle.TextSize = 14
+
+-- UI LOGIC
 ToggleMenuBtn.MouseButton1Click:Connect(function()
     MenuOpen = not MenuOpen
     MainFrame.Visible = MenuOpen
     ToggleMenuBtn.Text = MenuOpen and "HIDE" or "OPEN"
 end)
 
-RLGLToggle.MouseButton1Click:Connect(function()
-    RLGLEnabled = not RLGLEnabled
-    if RLGLEnabled then
-        RLGLToggle.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
-        RLGLToggle.Text = "RLGL Auto-Freeze: ON"
-    else
-        RLGLToggle.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-        RLGLToggle.Text = "RLGL Auto-Freeze: OFF"
-        RLGLStatus.Text = "Doll State: Monitoring inactive"
-        local char = game:GetService("Players").LocalPlayer.Character
-        local hrp = char and char:FindFirstChild("HumanoidRootPart")
-        if hrp then hrp.Anchored = false end
-    end
+DodgeToggle.MouseButton1Click:Connect(function()
+    DodgeEnabled = not DodgeEnabled
+    DodgeToggle.BackgroundColor3 = DodgeEnabled and Color3.fromRGB(50, 180, 50) or Color3.fromRGB(200, 50, 50)
+    DodgeToggle.Text = DodgeEnabled and "Smart Knife Dodge: ON" or "Smart Knife Dodge: OFF"
 end)
 
--- РАБОЧАЯ ЛОГИКА RED LIGHT GREEN LIGHT
+GlassToggle.MouseButton1Click:Connect(function()
+    GlassEnabled = not GlassEnabled
+    GlassToggle.BackgroundColor3 = GlassEnabled and Color3.fromRGB(50, 180, 50) or Color3.fromRGB(200, 50, 50)
+    GlassToggle.Text = GlassEnabled and "Glass Bridge ESP: ON" or "Glass Bridge ESP: OFF"
+end)
+
+HoneyToggle.MouseButton1Click:Connect(function()
+    HoneyEnabled = not HoneyEnabled
+    HoneyToggle.BackgroundColor3 = HoneyEnabled and Color3.fromRGB(50, 180, 50) or Color3.fromRGB(200, 50, 50)
+    HoneyToggle.Text = HoneyEnabled and "Honeycomb Clicker: ON" or "Honeycomb Clicker: OFF"
+end)
+
+-- CORE MECHANICS
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local VIM = game:GetService("VirtualInputManager")
 local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
 
--- Функция поиска куклы или звукового триггера в Ink Game
-local function isRedLight()
-    -- Сканируем workspace на наличие куклы или состояния звука/света
-    -- В Ink Game состояние часто реплицируется через StringValue или String Attribute в workspace
-    local stateObject = workspace:FindFirstChild("TrafficLight") or workspace:FindFirstChild("DollState") or workspace:FindFirstChild("LightState")
-    
-    if stateObject then
-        if stateObject:IsA("StringValue") and (stateObject.Value == "Red" or stateObject.Value == "RedLight") then
-            return true
+-- 1. Smart Knife Dodge Logic
+local function checkKnifeAttacks()
+    local myChar = LocalPlayer.Character
+    local myHrp = myChar and myChar:FindFirstChild("HumanoidRootPart")
+    if not myHrp then return false end
+
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character then
+            local enemyHrp = player.Character:FindFirstChild("HumanoidRootPart")
+            local enemyAnimator = player.Character:FindFirstChildOfClass("Humanoid") and player.Character.Humanoid:FindFirstChildOfClass("Animator")
+            
+            if enemyHrp and enemyAnimator then
+                local distance = (myHrp.Position - enemyHrp.Position).Magnitude
+                if distance <= KNIFE_RANGE then
+                    local activeTracks = enemyAnimator:GetPlayingAnimationTracks()
+                    for _, track in ipairs(activeTracks) do
+                        local animName = string.lower(track.Animation.Name or "")
+                        if string.find(animName, "hit") or string.find(animName, "slash") or string.find(animName, "stab") or string.find(animName, "swing") then
+                            return true
+                        end
+                    end
+                end
+            end
         end
     end
-    
-    -- Альтернативный метод по глобальным атрибутам самой игры
-    local map = workspace:FindFirstChild("Map") or workspace:FindFirstChild("CurrentMap")
-    if map and map:GetAttribute("Light") == "Red" then
-        return true
-    end
-    
     return false
 end
 
 RunService.Heartbeat:Connect(function()
-    if not RLGLEnabled then return end
+    if not DodgeEnabled or isDodging then return end
     
-    local char = LocalPlayer.Character
-    local hrp = char and char:FindFirstChild("HumanoidRootPart")
-    if not hrp then return end
+    if checkKnifeAttacks() then
+        isDodging = true
+        local tapX = Camera.ViewportSize.X * 0.85
+        local tapY = Camera.ViewportSize.Y * 0.75
+        
+        VIM:SendMouseButtonEvent(tapX, tapY, 0, true, game, 1)
+        task.wait(0.01)
+        VIM:SendMouseButtonEvent(tapX, tapY, 0, false, game, 1)
+        
+        task.wait(0.5) 
+        isDodging = false
+    end
+end)
+
+-- 2. Glass Bridge ESP Logic
+RunService.Heartbeat:Connect(function()
+    if not GlassEnabled then return end
     
-    if isRedLight() then
-        hrp.Anchored = true -- Намертво замораживаем физику, кукла не убьет
-        RLGLStatus.Text = "Doll State: RED (Frozen)"
-        RLGLStatus.TextColor3 = Color3.fromRGB(255, 50, 50)
-    else
-        hrp.Anchored = false -- Размораживаем, можно бежать
-        RLGLStatus.Text = "Doll State: GREEN (Safe)"
-        RLGLStatus.TextColor3 = Color3.fromRGB(50, 255, 50)
+    -- Scans for glass platforms under workspace
+    -- Real glass usually has distinct properties, names or attributes like "Fake" or "Real"
+    local bridge = workspace:FindFirstChild("GlassBridge") or workspace:FindFirstChild("Bridge")
+    if bridge then
+        for _, part in ipairs(bridge:GetDescendants()) do
+            if part:IsA("Part") or part:IsA("MeshPart") then
+                -- Check standard naming conventions or custom attributes used by developers
+                if string.find(string.lower(part.Name), "fake") or part:GetAttribute("Fake") == true then
+                    part.Transparency = 0.8
+                    part.Color = Color3.fromRGB(255, 0, 0) -- Fake glass turns translucent red
+                    part.CanCollide = false -- Extra protection so you don't accidentally step on it
+                elseif string.find(string.lower(part.Name), "real") or part:GetAttribute("Real") == true then
+                    part.Color = Color3.fromRGB(0, 255, 0) -- Safe glass turns green
+                end
+            end
+        end
+    end
+end)
+
+-- 3. Honeycomb Micro-Clicker Logic
+RunService.Heartbeat:Connect(function()
+    if not HoneyEnabled or isClickingHoney then return end
+    
+    -- Look for Honeycomb mini-game interface element or UI line target
+    local playerGui = LocalPlayer:FindFirstChildOfClass("PlayerGui")
+    local honeyGui = playerGui and (playerGui:FindFirstChild("Honeycomb") or playerGui:FindFirstChild("HoneycombGui"))
+    
+    if honeyGui and honeyGui.Enabled then
+        isClickingHoney = true
+        
+        -- Locates the precise center or specific click zone target
+        local traceTarget = honeyGui:FindFirstChild("ClickZone") or honeyGui:FindFirstChild("Circle")
+        if traceTarget and traceTarget.Visible then
+            local targetPos = traceTarget.AbsolutePosition
+            local targetSize = traceTarget.AbsoluteSize
+            
+            -- Calculate precise safe click coordinates based on UI position
+            local clickX = targetPos.X + (targetSize.X / 2)
+            local clickY = targetPos.Y + (targetSize.Y / 2)
+            
+            VIM:SendMouseButtonEvent(clickX, clickY, 0, true, game, 1)
+            task.wait(0.01)
+            VIM:SendMouseButtonEvent(clickX, clickY, 0, false, game, 1)
+        end
+        
+        -- Calculated safe delay (30-60ms) to bypass server click limits (Anti-Spam)
+        task.wait(math.random(35, 65) / 1000)
+        isClickingHoney = false
     end
 end)
