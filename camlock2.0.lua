@@ -1,145 +1,132 @@
-local ScreenGui = Instance.new("ScreenGui")
-local MainFrame = Instance.new("Frame")
-local Title = Instance.new("TextLabel")
-local ToggleBtn = Instance.new("TextButton")
-local StatusLabel = Instance.new("TextLabel")
-
-ScreenGui.Parent = game:GetService("CoreGui")
-ScreenGui.Name = "PenyaScriptableLock"
-
-MainFrame.Parent = ScreenGui
-MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
-MainFrame.BorderSizePixel = 1
-MainFrame.BorderColor3 = Color3.fromRGB(0, 180, 255)
-MainFrame.Position = UDim2.new(0.1, 0, 0.3, 0)
-MainFrame.Size = UDim2.new(0, 220, 0, 130)
-MainFrame.Active = true
-MainFrame.Draggable = true
-
-Title.Parent = MainFrame
-Title.Size = UDim2.new(1, 0, 0.3, 0)
-Title.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-Title.Text = "🔒 Penya Camlock v3"
-Title.TextColor3 = Color3.fromRGB(0, 180, 255)
-Title.TextSize = 15
-Title.Font = Enum.Font.SourceSansBold
-
-ToggleBtn.Parent = MainFrame
-ToggleBtn.Position = UDim2.new(0.1, 0, 0.4, 0)
-ToggleBtn.Size = UDim2.new(0.8, 0, 0.35, 0)
-ToggleBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-ToggleBtn.Text = "CAMLOCK: OFF"
-ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-ToggleBtn.TextSize = 14
-
-StatusLabel.Parent = MainFrame
-StatusLabel.Position = UDim2.new(0, 0, 0.8, 0)
-StatusLabel.Size = UDim2.new(1, 0, 0.2, 0)
-StatusLabel.BackgroundTransparency = 1
-StatusLabel.Text = "Target: None"
-StatusLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
-StatusLabel.TextSize = 12
-
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local Workspace = game:GetService("Workspace")
+local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
 
-local CamlockActive = false
+-- CONFIGURATION
+local CAMLOCK_KEY = Enum.KeyCode.E -- Keybind to lock/unlock target
+local TARGET_RADIUS = 200 -- Screen radius to search for target
+
 local TargetPlayer = nil
-local CamLoop = nil
+local CamlockEnabled = false
+local TargetHighlight = nil
 
--- Расстояние камеры от твоего персонажа (высота и отдаление сзади)
-local CameraOffset = Vector3.new(0, 2.5, 8) 
+-- Clean existing Highlight if script restarts
+if game:GetService("CoreGui"):FindFirstChild("PenyaTargetESP") then
+    game:GetService("CoreGui").PenyaTargetESP:Destroy()
+end
 
-local function GetClosestPlayer()
-    local closest = nil
-    local shortestDistance = math.huge
-    local camera = Workspace.CurrentCamera
-    if not camera then return nil end
+-- Create persistent Highlight object for Target ESP
+TargetHighlight = Instance.new("Highlight")
+TargetHighlight.Name = "PenyaTargetESP"
+TargetHighlight.FillColor = Color3.fromRGB(0, 100, 255) -- Solid Blue
+TargetHighlight.OutlineColor = Color3.fromRGB(255, 255, 255) -- White Outline
+TargetHighlight.FillTransparency = 0.5
+TargetHighlight.OutlineTransparency = 0.2
+TargetHighlight.Enabled = false
+TargetHighlight.Parent = game:GetService("CoreGui")
 
-    for _, player in pairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-            local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
-            if humanoid and humanoid.Health > 0 then
-                local pos, onScreen = camera:WorldToViewportPoint(player.Character.HumanoidRootPart.Position)
+-- Math function to check walls between LocalPlayer and Target
+local function isBehindWall(targetCharacter)
+    local myChar = LocalPlayer.Character
+    local myHrp = myChar and myChar:FindFirstChild("HumanoidRootPart")
+    local targetHrp = targetCharacter and targetCharacter:FindFirstChild("HumanoidRootPart")
+    
+    if myHrp and targetHrp then
+        -- Create a ray from your head/camera position to target's body
+        local origin = Camera.CFrame.Position
+        local direction = (targetHrp.Position - origin)
+        local ray = Ray.new(origin, direction)
+        
+        -- Ignore list so the ray doesn't hit yourself or the target's own body parts
+        local ignoreList = {myChar, targetCharacter, Camera}
+        local hitPart, hitPosition = workspace:FindPartOnRayWithIgnoreList(ray, ignoreList)
+        
+        -- If ray hits a map element (Wall, Floor, Block) before reaching target
+        if hitPart and not hitPart:IsDescendantOf(targetCharacter) and hitPart.CanCollide then
+            return true -- Target is obstructed by wall
+        end
+    end
+    return false -- Path is clear
+end
+
+-- Function to acquire the closest valid player near screen center
+local function getClosestPlayerToCenter()
+    local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+    local closestEnemy = nil
+    local shortestDistance = TARGET_RADIUS
+
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character then
+            local hrp = player.Character:FindFirstChild("HumanoidRootPart")
+            local hum = player.Character:FindFirstChildOfClass("Humanoid")
+            
+            if hrp and hum and hum.Health > 0 then
+                local screenPos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
+                
                 if onScreen then
-                    local mousePos = camera.ViewportSize / 2
-                    local distance = (Vector2.new(pos.X, pos.Y) - mousePos).Magnitude
+                    local distance = (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude
                     if distance < shortestDistance then
-                        closest = player
-                        shortestDistance = distance
+                        -- Check walls immediately upon target selection
+                        if not isBehindWall(player.Character) then
+                            shortestDistance = distance
+                            closestEnemy = player
+                        end
                     end
                 end
             end
         end
     end
-    return closest
+    return closestEnemy
 end
 
-ToggleBtn.MouseButton1Click:Connect(function()
-    CamlockActive = not CamlockActive
-    local camera = Workspace.CurrentCamera
-    
-    if CamlockActive then
-        TargetPlayer = GetClosestPlayer()
+-- Input handler for activation
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == CAMLOCK_KEY then
+        CamlockEnabled = not CamlockEnabled
         
-        if TargetPlayer and TargetPlayer.Character then
-            ToggleBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
-            ToggleBtn.Text = "CAMLOCK: ON"
-            StatusLabel.Text = "Locked on: " .. TargetPlayer.Name
-            
-            -- Врубаем ручной режим управления камерой, отключая стандартную физику Roblox
-            camera.CameraType = Enum.CameraType.Scriptable
-            
-            CamLoop = RunService.RenderStepped:Connect(function()
-                if not CamlockActive or not camera then return end
-                
-                local myChar = LocalPlayer.Character
-                local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
-                
-                if myHRP and TargetPlayer and TargetPlayer.Character and TargetPlayer.Character:FindFirstChild("HumanoidRootPart") then
-                    local targetHRP = TargetPlayer.Character.HumanoidRootPart
-                    local targetHum = TargetPlayer.Character:FindFirstChildOfClass("Humanoid")
-                    
-                    if targetHum and targetHum.Health > 0 then
-                        -- 1. Считаем направление от тебя к противнику (только по горизонтали, чтобы камеру не кренило)
-                        local lookVector = (targetHRP.Position - myHRP.Position).Unit
-                        
-                        -- 2. Жестко позиционируем камеру строго за спиной твоего персонажа относительно врага
-                        -- Твой персонаж гарантированно останется в самом центре экрана
-                        local camPosition = myHRP.Position - (lookVector * CameraOffset.Z) + Vector3.new(0, CameraOffset.Y, 0)
-                        
-                        -- 3. Мгновенно перезаписываем CFrame камеры, направляя её из рассчитанной точки прямо в шею цели
-                        camera.CFrame = CFrame.new(camPosition, targetHRP.Position + Vector3.new(0, 1.5, 0))
-                        
-                        -- 4. Принудительно разворачиваем твоего персонажа лицом к цели, чтобы деши шли в правильном направлении
-                        myHRP.CFrame = CFrame.new(myHRP.Position, Vector3.new(targetHRP.Position.X, myHRP.Position.Y, targetHRP.Position.Z))
-                    else
-                        TargetPlayer = GetClosestPlayer()
-                    end
-                else
-                    TargetPlayer = GetClosestPlayer()
-                end
-            end)
+        if CamlockEnabled then
+            TargetPlayer = getClosestPlayerToCenter()
+            if not TargetPlayer then
+                CamlockEnabled = false -- Reset if no clear player found
+            end
         else
-            CamlockActive = false
-            StatusLabel.Text = "No players on screen!"
+            TargetPlayer = nil
+            TargetHighlight.Enabled = false
+            TargetHighlight.Adornee = nil
         end
-    else
-        ToggleBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-        ToggleBtn.Text = "CAMLOCK: OFF"
-        StatusLabel.Text = "Target: None"
+    end
+end)
+
+-- Main tracking loop running at maximum frame rate
+RunService.RenderStepped:Connect(function()
+    if CamlockEnabled and TargetPlayer and TargetPlayer.Character then
+        local targetHrp = TargetPlayer.Character:FindFirstChild("HumanoidRootPart")
+        local targetHum = TargetPlayer.Character:FindFirstChildOfClass("Humanoid")
         
-        if CamLoop then
-            CamLoop:Disconnect()
-            CamLoop = nil
+        -- Break lock if enemy dies
+        if not targetHrp or (targetHum and targetHum.Health <= 0) then
+            CamlockEnabled = false
+            TargetPlayer = nil
+            TargetHighlight.Enabled = false
+            TargetHighlight.Adornee = nil
+            return
         end
-        TargetPlayer = nil
         
-        -- Возвращаем управление камере обратно игроку
-        if camera then
-            camera.CameraType = Enum.CameraType.Custom
+        -- Dynamic Wall Check verification during lock state
+        if not isBehindWall(TargetPlayer.Character) then
+            -- Smooth camera interpolation towards target HumanoidRootPart position
+            Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, targetHrp.Position)
+            
+            -- Apply blue ESP highlight to currently locked visible player
+            TargetHighlight.Adornee = TargetPlayer.Character
+            TargetHighlight.Enabled = true
+        else
+            -- If target goes behind a wall, pause camera tracking but hold target identity inside script
+            TargetHighlight.Enabled = false
+            TargetHighlight.Adornee = nil
         end
     end
 end)
