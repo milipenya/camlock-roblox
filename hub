@@ -1,16 +1,16 @@
 -- =================================================================
--- 🖥️ STANDALONE FAKE PC EMULATOR (MOBILE TO PC LAYOUT)
+-- 🖥️ WORKING STANDALONE FAKE PC EMULATOR (WITH FUNCTIONAL WASD)
 -- =================================================================
 
 local CoreGui = game:GetService("CoreGui")
 local Players = game:GetService("Players")
-local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
 local LocalPlayer = Players.LocalPlayer
-local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+local Camera = Workspace.CurrentCamera
 
--- Очищаем старую версию, если запускаешь повторно
+-- Очищаем старую версию
 if CoreGui:FindFirstChild("FakePCEmulator_Standalone") then
     CoreGui.FakePCEmulator_Standalone:Destroy()
 end
@@ -21,18 +21,26 @@ ScreenGui.ResetOnSpawn = false
 ScreenGui.Parent = CoreGui
 
 -- ==========================================
--- 🎛️ ПАЛЬЦЕМ ПЕРЕМЕЩАЕМЫЙ КОНТЕЙНЕР КЛАВИШ (WASD + СПЕЦ. КНОПКИ)
+-- 🎛️ ПАЛЬЦЕМ ПЕРЕМЕЩАЕМЫЙ КОНТЕЙНЕР КЛАВИШ
 -- ==========================================
 local PCFrame = Instance.new("Frame")
 PCFrame.Name = "PCControlPanel"
-PCFrame.Size = UDim2.new(0, 240, 0, 160)
-PCFrame.Position = UDim2.new(0.65, 0, 0.45, 0) -- Начальная позиция справа
+PCFrame.Size = UDim2.new(0, 200, 0, 150)
+PCFrame.Position = UDim2.new(0.6, 0, 0.4, 0) -- Сдвинул правее, чтобы не перекрывать центр экрана
 PCFrame.BackgroundTransparency = 1
 PCFrame.Active = true
-PCFrame.Draggable = true -- ВЕСЬ БЛОК МОЖНО ТАСКАТЬ ПАЛЬЦЕМ В УДОБНОЕ МЕСТО!
+PCFrame.Draggable = true -- ВЕСЬ БЛОК МОЖНО ТАСКАТЬ ПАЛЬЦЕМ!
 PCFrame.Parent = ScreenGui
 
-local function CreateKey(name, text, size, pos, callback)
+-- Состояния нажатий клавиш
+local keysPressed = {
+    W = false,
+    A = false,
+    S = false,
+    D = false
+}
+
+local function CreateKey(name, text, size, pos, onStateChange)
     local btn = Instance.new("TextButton")
     btn.Name = name
     btn.Size = size
@@ -54,12 +62,12 @@ local function CreateKey(name, text, size, pos, callback)
     stroke.Color = Color3.fromRGB(0, 170, 255)
     stroke.Parent = btn
 
-    local activeState = false
     local function trigger(state)
-        activeState = state
-        btn.BackgroundColor3 = activeState and Color3.fromRGB(0, 140, 220) or Color3.fromRGB(20, 20, 30)
-        btn.BackgroundTransparency = activeState and 0.1 or 0.3
-        pcall(callback, activeState)
+        btn.BackgroundColor3 = state and Color3.fromRGB(0, 140, 220) or Color3.fromRGB(20, 20, 30)
+        btn.BackgroundTransparency = state and 0.1 or 0.3
+        if onStateChange then
+            onStateChange(state)
+        end
     end
 
     btn.MouseButton1Down:Connect(function() trigger(true) end)
@@ -68,23 +76,21 @@ local function CreateKey(name, text, size, pos, callback)
     btn.TouchEnded:Connect(function() trigger(false) end)
 end
 
--- Раскладка WASD
-CreateKey("W_Key", "W", UDim2.new(0, 45, 0, 45), UDim2.new(0, 50, 0, 0), function(state)
-    -- Сюда привязывается движение вперед
-end)
-CreateKey("A_Key", "A", UDim2.new(0, 45, 0, 45), UDim2.new(0, 0, 0, 50), function(state) end)
-CreateKey("S_Key", "S", UDim2.new(0, 45, 0, 45), UDim2.new(0, 50, 0, 50), function(state) end)
-CreateKey("D_Key", "D", UDim2.new(0, 45, 0, 45), UDim2.new(0, 100, 0, 50), function(state) end)
+-- Создаем WASD с привязкой к движению
+CreateKey("W_Key", "W", UDim2.new(0, 45, 0, 45), UDim2.new(0, 45, 0, 0), function(state) keysPressed.W = state end)
+CreateKey("A_Key", "A", UDim2.new(0, 45, 0, 45), UDim2.new(0, 0, 0, 45), function(state) keysPressed.A = state end)
+CreateKey("S_Key", "S", UDim2.new(0, 45, 0, 45), UDim2.new(0, 45, 0, 45), function(state) keysPressed.S = state end)
+CreateKey("D_Key", "D", UDim2.new(0, 45, 0, 45), UDim2.new(0, 90, 0, 45), function(state) keysPressed.D = state end)
 
 -- Кнопка SPACE (Прыжок)
-CreateKey("Space_Key", "SPACE", UDim2.new(0, 145, 0, 35), UDim2.new(0, 0, 0, 100), function(state)
+CreateKey("Space_Key", "SPACE", UDim2.new(0, 135, 0, 35), UDim2.new(0, 0, 0, 95), function(state)
     local char = LocalPlayer.Character
     local hum = char and char:FindFirstChildOfClass("Humanoid")
     if hum then hum.Jump = state end
 end)
 
 -- Кнопка E (Взаимодействие)
-CreateKey("E_Key", "E", UDim2.new(0, 45, 0, 45), UDim2.new(0, 155, 0, 0), function(state)
+CreateKey("E_Key", "E", UDim2.new(0, 40, 0, 45), UDim2.new(0, 138, 0, 0), function(state)
     if state then
         for _, prompt in pairs(Workspace:GetDescendants()) do
             if prompt:IsA("ProximityPrompt") and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
@@ -97,40 +103,55 @@ CreateKey("E_Key", "E", UDim2.new(0, 45, 0, 45), UDim2.new(0, 155, 0, 0), functi
     end
 end)
 
--- Кнопка SHIFT (Блокировка мыши / Шифтлок)
-CreateKey("Shift_Key", "SHIFT", UDim2.new(0, 85, 0, 35), UDim2.new(0, 155, 0, 100), function(state)
-    LocalPlayer.DevEnableMouseLock = state
+-- Физический цикл движения по нажатию виртуальных WASD
+RunService.RenderStepped:Connect(function()
+    local char = LocalPlayer.Character
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    
+    if hum then
+        local moveDir = Vector3.new(0, 0, 0)
+        local camFwd = Camera.CFrame.LookVector
+        local camRight = Camera.CFrame.RightVector
+        
+        camFwd = Vector3.new(camFwd.X, 0, camFwd.Z).Unit
+        camRight = Vector3.new(camRight.X, 0, camRight.Z).Unit
+        
+        if keysPressed.W then moveDir = moveDir + camFwd end
+        if keysPressed.S then moveDir = moveDir - camFwd end
+        if keysPressed.D then moveDir = moveDir + camRight end
+        if keysPressed.A then moveDir = moveDir - camRight end
+        
+        if moveDir.Magnitude > 0 then
+            hum:Move(moveDir.Unit, false)
+        else
+            hum:Move(Vector3.new(0, 0, 0), false)
+        end
+    end
 end)
 
 -- ==========================================
--- ⚙️ КНОПКА СВОРАЧИВАНИЯ / СКРЫТИЯ ПАНЕЛИ
+-- ⚙️ КНОПКА СВОРАЧИВАНИЯ ПАНЕЛИ
 -- ==========================================
 local ToggleBtn = Instance.new("TextButton")
-ToggleBtn.Size = UDim2.new(0, 40, 0, 40)
-ToggleBtn.Position = UDim2.new(0, 20, 0.2, 0)
+ToggleBtn.Size = UDim2.new(0, 35, 0, 35)
+ToggleBtn.Position = UDim2.new(0, 15, 0.2, 0)
 ToggleBtn.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
 ToggleBtn.BackgroundTransparency = 0.2
 ToggleBtn.Text = "💻"
 ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-ToggleBtn.TextSize = 18
+ToggleBtn.TextSize = 16
 ToggleBtn.Active = true
-ToggleBtn.Draggable = true -- Саму кнопку меню тоже можно двигать
+ToggleBtn.Draggable = true
 ToggleBtn.Parent = ScreenGui
 
 local TCorner = Instance.new("UICorner")
 TCorner.CornerRadius = UDim.new(1, 0)
 TCorner.Parent = ToggleBtn
 
-local TStroke = Instance.new("UIStroke")
-TStroke.Thickness = 1.5
-TStroke.Color = Color3.fromRGB(0, 170, 255)
-TStroke.Parent = ToggleBtn
-
 local panelVisible = true
 ToggleBtn.MouseButton1Click:Connect(function()
     panelVisible = not panelVisible
     PCFrame.Visible = panelVisible
-    ToggleBtn.BackgroundColor3 = panelVisible and Color3.fromRGB(20, 20, 30) or Color3.fromRGB(0, 140, 220)
 end)
 
-print("✅ Standalone Fake PC Emulator успешно запущен! Перетаскивай панель в любое место экрана.")
+print("✅ Рабочий Fake PC Emulator запущен! Клавиши WASD теперь двигают персонажа.")
