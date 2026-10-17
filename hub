@@ -1,341 +1,136 @@
 -- =================================================================
--- ⚡ UNIVERSAL SMART HUB v3.0 (ULTIMATE CAMLOCK & AIMBOT)
+-- 🖥️ STANDALONE FAKE PC EMULATOR (MOBILE TO PC LAYOUT)
 -- =================================================================
 
 local CoreGui = game:GetService("CoreGui")
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
 
 local LocalPlayer = Players.LocalPlayer
-local Camera = Workspace.CurrentCamera
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
-if CoreGui:FindFirstChild("UniversalSmartHub_v3") then
-    CoreGui.UniversalSmartHub_v3:Destroy()
+-- Очищаем старую версию, если запускаешь повторно
+if CoreGui:FindFirstChild("FakePCEmulator_Standalone") then
+    CoreGui.FakePCEmulator_Standalone:Destroy()
 end
 
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "UniversalSmartHub_v3"
+ScreenGui.Name = "FakePCEmulator_Standalone"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.Parent = CoreGui
 
--- Настройки
-local Config = {
-    Aimbot = {
-        Enabled = false,
-        FOV = 120,
-        TargetMode = "Cursor", -- "Cursor" или "Distance"
-        Prediction = 1.2
-    },
-    Camlock = {
-        Active = false,
-        TargetMode = "Cursor",
-        Target = nil
-    }
-}
+-- ==========================================
+-- 🎛️ ПАЛЬЦЕМ ПЕРЕМЕЩАЕМЫЙ КОНТЕЙНЕР КЛАВИШ (WASD + СПЕЦ. КНОПКИ)
+-- ==========================================
+local PCFrame = Instance.new("Frame")
+PCFrame.Name = "PCControlPanel"
+PCFrame.Size = UDim2.new(0, 240, 0, 160)
+PCFrame.Position = UDim2.new(0.65, 0, 0.45, 0) -- Начальная позиция справа
+PCFrame.BackgroundTransparency = 1
+PCFrame.Active = true
+PCFrame.Draggable = true -- ВЕСЬ БЛОК МОЖНО ТАСКАТЬ ПАЛЬЦЕМ В УДОБНОЕ МЕСТО!
+PCFrame.Parent = ScreenGui
 
--- Подсветка цели для камлока
-local TargetHighlight = Instance.new("Highlight")
-TargetHighlight.FillColor = Color3.fromRGB(255, 0, 80)
-TargetHighlight.OutlineColor = Color3.fromRGB(255, 255, 255)
-TargetHighlight.FillTransparency = 0.5
-TargetHighlight.Enabled = false
-TargetHighlight.Parent = CoreGui
+local function CreateKey(name, text, size, pos, callback)
+    local btn = Instance.new("TextButton")
+    btn.Name = name
+    btn.Size = size
+    btn.Position = pos
+    btn.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
+    btn.BackgroundTransparency = 0.3
+    btn.Text = text
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.Font = Enum.Font.SourceSansBold
+    btn.TextSize = 15
+    btn.Parent = PCFrame
 
--- Функция поиска цели
-local function GetTarget(mode, maxFOV)
-    local closestTarget = nil
-    local shortestMetric = maxFOV or 99999
-    local centerScreen = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 8)
+    corner.Parent = btn
 
-    for _, player in pairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") and player.Character:FindFirstChildOfClass("Humanoid") then
-            local hum = player.Character:FindFirstChildOfClass("Humanoid")
-            if hum.Health > 0 then
-                local hrp = player.Character.HumanoidRootPart
-                local screenPos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
+    local stroke = Instance.new("UIStroke")
+    stroke.Thickness = 1.5
+    stroke.Color = Color3.fromRGB(0, 170, 255)
+    stroke.Parent = btn
 
-                if onScreen then
-                    if mode == "Cursor" then
-                        local distToCenter = (Vector2.new(screenPos.X, screenPos.Y) - centerScreen).Magnitude
-                        if distToCenter < shortestMetric then
-                            shortestMetric = distToCenter
-                            closestTarget = player
-                        end
-                    elseif mode == "Distance" then
-                        local myHRP = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-                        if myHRP then
-                            local worldDist = (hrp.Position - myHRP.Position).Magnitude
-                            if worldDist < shortestMetric then
-                                shortestMetric = worldDist
-                                closestTarget = player
-                            end
-                        end
-                    end
+    local activeState = false
+    local function trigger(state)
+        activeState = state
+        btn.BackgroundColor3 = activeState and Color3.fromRGB(0, 140, 220) or Color3.fromRGB(20, 20, 30)
+        btn.BackgroundTransparency = activeState and 0.1 or 0.3
+        pcall(callback, activeState)
+    end
+
+    btn.MouseButton1Down:Connect(function() trigger(true) end)
+    btn.MouseButton1Up:Connect(function() trigger(false) end)
+    btn.TouchStarted:Connect(function() trigger(true) end)
+    btn.TouchEnded:Connect(function() trigger(false) end)
+end
+
+-- Раскладка WASD
+CreateKey("W_Key", "W", UDim2.new(0, 45, 0, 45), UDim2.new(0, 50, 0, 0), function(state)
+    -- Сюда привязывается движение вперед
+end)
+CreateKey("A_Key", "A", UDim2.new(0, 45, 0, 45), UDim2.new(0, 0, 0, 50), function(state) end)
+CreateKey("S_Key", "S", UDim2.new(0, 45, 0, 45), UDim2.new(0, 50, 0, 50), function(state) end)
+CreateKey("D_Key", "D", UDim2.new(0, 45, 0, 45), UDim2.new(0, 100, 0, 50), function(state) end)
+
+-- Кнопка SPACE (Прыжок)
+CreateKey("Space_Key", "SPACE", UDim2.new(0, 145, 0, 35), UDim2.new(0, 0, 0, 100), function(state)
+    local char = LocalPlayer.Character
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    if hum then hum.Jump = state end
+end)
+
+-- Кнопка E (Взаимодействие)
+CreateKey("E_Key", "E", UDim2.new(0, 45, 0, 45), UDim2.new(0, 155, 0, 0), function(state)
+    if state then
+        for _, prompt in pairs(Workspace:GetDescendants()) do
+            if prompt:IsA("ProximityPrompt") and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                local hrp = LocalPlayer.Character.HumanoidRootPart
+                if (hrp.Position - prompt.Parent.Position).Magnitude <= (prompt.MaxActivationDistance + 15) then
+                    fireproximityprompt(prompt)
                 end
             end
         end
     end
-    return closestTarget
-end
+end)
+
+-- Кнопка SHIFT (Блокировка мыши / Шифтлок)
+CreateKey("Shift_Key", "SHIFT", UDim2.new(0, 85, 0, 35), UDim2.new(0, 155, 0, 100), function(state)
+    LocalPlayer.DevEnableMouseLock = state
+end)
 
 -- ==========================================
--- 🎨 ГЛАВНОЕ МЕНЮ
+-- ⚙️ КНОПКА СВОРАЧИВАНИЯ / СКРЫТИЯ ПАНЕЛИ
 -- ==========================================
-local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 280, 0, 360)
-MainFrame.Position = UDim2.new(0.5, -140, 0.25, 0)
-MainFrame.BackgroundColor3 = Color3.fromRGB(16, 16, 22)
-MainFrame.BackgroundTransparency = 0.1
-MainFrame.Active = true
-MainFrame.Draggable = true
-MainFrame.Visible = false
-MainFrame.Parent = ScreenGui
-
-local MainCorner = Instance.new("UICorner")
-MainCorner.CornerRadius = UDim.new(0, 10)
-MainCorner.Parent = MainFrame
-
-local MainStroke = Instance.new("UIStroke")
-MainStroke.Thickness = 2
-MainStroke.Color = Color3.fromRGB(0, 170, 255)
-MainStroke.Parent = MainFrame
-
-local Title = Instance.new("TextLabel")
-Title.Size = UDim2.new(1, 0, 0, 40)
-Title.BackgroundTransparency = 1
-Title.Text = "⚡ SMART HUB v3.0"
-Title.TextColor3 = Color3.fromRGB(255, 255, 255)
-Title.TextSize = 15
-Title.Font = Enum.Font.SourceSansBold
-Title.Parent = MainFrame
-
--- Плавающая кнопка хаба
-local HubToggle = Instance.new("TextButton")
-HubToggle.Size = UDim2.new(0, 45, 0, 45)
-HubToggle.Position = UDim2.new(0, 15, 0.15, 0)
-HubToggle.BackgroundColor3 = Color3.fromRGB(24, 24, 32)
-HubToggle.Text = "⚡"
-HubToggle.TextSize = 22
-HubToggle.Active = true
-HubToggle.Draggable = true
-HubToggle.Parent = ScreenGui
-
-local HubCorner = Instance.new("UICorner")
-HubCorner.CornerRadius = UDim.new(1, 0)
-HubCorner.Parent = HubToggle
-
-HubToggle.MouseButton1Click:Connect(function()
-    MainFrame.Visible = not MainFrame.Visible
-end)
-
-local Scroll = Instance.new("ScrollingFrame")
-Scroll.Size = UDim2.new(1, -20, 1, -50)
-Scroll.Position = UDim2.new(0, 10, 0, 45)
-Scroll.BackgroundTransparency = 1
-Scroll.CanvasSize = UDim2.new(0, 0, 0, 420)
-Scroll.ScrollBarThickness = 4
-Scroll.Parent = MainFrame
-
-local UIList = Instance.new("UIListLayout")
-UIList.Padding = UDim.new(0, 8)
-UIList.HorizontalAlignment = Enum.HorizontalAlignment.Center
-UIList.Parent = Scroll
-
-local function CreateButton(text, callback)
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(1, -10, 0, 36)
-    btn.BackgroundColor3 = Color3.fromRGB(28, 28, 38)
-    btn.Text = text
-    btn.TextColor3 = Color3.fromRGB(220, 220, 220)
-    btn.TextSize = 12
-    btn.Font = Enum.Font.SourceSansBold
-    btn.Parent = Scroll
-
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 6)
-    corner.Parent = btn
-
-    btn.MouseButton1Click:Connect(function()
-        pcall(callback, btn)
-    end)
-    return btn
-end
-
--- ==========================================
--- УПРАВЛЕНИЕ НАСТРОЙКАМИ В МЕНЮ
--- ==========================================
-CreateButton("🎯 Aimbot: OFF", function(btn)
-    Config.Aimbot.Enabled = not Config.Aimbot.Enabled
-    btn.Text = Config.Aimbot.Enabled and "🎯 Aimbot: ON" or "🎯 Aimbot: OFF"
-    btn.BackgroundColor3 = Config.Aimbot.Enabled and Color3.fromRGB(0, 140, 220) or Color3.fromRGB(28, 28, 38)
-end)
-
-CreateButton("🎯 Aim Target: Cursor", function(btn)
-    if Config.Aimbot.TargetMode == "Cursor" then
-        Config.Aimbot.TargetMode = "Distance"
-        btn.Text = "🎯 Aim Target: Distance"
-    else
-        Config.Aimbot.TargetMode = "Cursor"
-        btn.Text = "🎯 Aim Target: Cursor"
-    end
-end)
-
-CreateButton("⭕ Aim FOV: 120", function(btn)
-    if Config.Aimbot.FOV == 120 then Config.Aimbot.FOV = 200
-    elseif Config.Aimbot.FOV == 200 then Config.Aimbot.FOV = 300
-    else Config.Aimbot.FOV = 120 end
-    btn.Text = "⭕ Aim FOV: " .. tostring(Config.Aimbot.FOV)
-end)
-
--- Плавающая кнопка Камлока
-local CamlockFloatingBtn = Instance.new("TextButton")
-CamlockFloatingBtn.Size = UDim2.new(0, 110, 0, 40)
-CamlockFloatingBtn.Position = UDim2.new(0.8, -50, 0.45, 0)
-CamlockFloatingBtn.BackgroundColor3 = Color3.fromRGB(24, 24, 32)
-CamlockFloatingBtn.Text = "🎥 Camlock"
-CamlockFloatingBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-CamlockFloatingBtn.Font = Enum.Font.SourceSansBold
-CamlockFloatingBtn.TextSize = 13
-CamlockFloatingBtn.Active = true
-CamlockFloatingBtn.Draggable = true
-CamlockFloatingBtn.Visible = false
-CamlockFloatingBtn.Parent = ScreenGui
-
-local CCorner = Instance.new("UICorner")
-CCorner.CornerRadius = UDim.new(0, 8)
-CCorner.Parent = CamlockFloatingBtn
-
-CreateButton("🎥 Показать кнопку Camlock", function(btn)
-    CamlockFloatingBtn.Visible = not CamlockFloatingBtn.Visible
-    btn.BackgroundColor3 = CamlockFloatingBtn.Visible and Color3.fromRGB(0, 140, 220) or Color3.fromRGB(28, 28, 38)
-end)
-
-CreateButton("🎥 Camlock Target: Cursor", function(btn)
-    if Config.Camlock.TargetMode == "Cursor" then
-        Config.Camlock.TargetMode = "Distance"
-        btn.Text = "🎥 Camlock Target: Distance"
-    else
-        Config.Camlock.TargetMode = "Cursor"
-        btn.Text = "🎥 Camlock Target: Cursor"
-    end
-end)
-
-CamlockFloatingBtn.MouseButton1Click:Connect(function()
-    Config.Camlock.Active = not Config.Camlock.Active
-    CamlockFloatingBtn.BackgroundColor3 = Config.Camlock.Active and Color3.fromRGB(50, 200, 50) or Color3.fromRGB(24, 24, 32)
-
-    if Config.Camlock.Active then
-        Config.Camlock.Target = GetTarget(Config.Camlock.TargetMode)
-    else
-        Config.Camlock.Target = nil
-        TargetHighlight.Enabled = false
-    end
-end)
-
--- Плавающая кнопка Troll Peek
-local TrollFloatingBtn = Instance.new("TextButton")
-TrollFloatingBtn.Size = UDim2.new(0, 120, 0, 40)
-TrollFloatingBtn.Position = UDim2.new(0.8, -50, 0.58, 0)
-TrollFloatingBtn.BackgroundColor3 = Color3.fromRGB(24, 24, 32)
-TrollFloatingBtn.Text = "😈 Troll Peek"
-TrollFloatingBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-TrollFloatingBtn.Font = Enum.Font.SourceSansBold
-TrollFloatingBtn.TextSize = 13
-TrollFloatingBtn.Active = true
-TrollFloatingBtn.Draggable = true
-TrollFloatingBtn.Visible = false
-TrollFloatingBtn.Parent = ScreenGui
+local ToggleBtn = Instance.new("TextButton")
+ToggleBtn.Size = UDim2.new(0, 40, 0, 40)
+ToggleBtn.Position = UDim2.new(0, 20, 0.2, 0)
+ToggleBtn.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
+ToggleBtn.BackgroundTransparency = 0.2
+ToggleBtn.Text = "💻"
+ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+ToggleBtn.TextSize = 18
+ToggleBtn.Active = true
+ToggleBtn.Draggable = true -- Саму кнопку меню тоже можно двигать
+ToggleBtn.Parent = ScreenGui
 
 local TCorner = Instance.new("UICorner")
-TCorner.CornerRadius = UDim.new(0, 8)
-TCorner.Parent = TrollFloatingBtn
+TCorner.CornerRadius = UDim.new(1, 0)
+TCorner.Parent = ToggleBtn
 
-CreateButton("😈 Показать кнопку Troll Peek", function(btn)
-    TrollFloatingBtn.Visible = not TrollFloatingBtn.Visible
-    btn.BackgroundColor3 = TrollFloatingBtn.Visible and Color3.fromRGB(0, 140, 220) or Color3.fromRGB(28, 28, 38)
+local TStroke = Instance.new("UIStroke")
+TStroke.Thickness = 1.5
+TStroke.Color = Color3.fromRGB(0, 170, 255)
+TStroke.Parent = ToggleBtn
+
+local panelVisible = true
+ToggleBtn.MouseButton1Click:Connect(function()
+    panelVisible = not panelVisible
+    PCFrame.Visible = panelVisible
+    ToggleBtn.BackgroundColor3 = panelVisible and Color3.fromRGB(20, 20, 30) or Color3.fromRGB(0, 140, 220)
 end)
 
-local isTrolling = false
-TrollFloatingBtn.MouseButton1Click:Connect(function()
-    if isTrolling then return end
-    isTrolling = true
-    local char = LocalPlayer.Character
-    local hrp = char and char:FindFirstChild("HumanoidRootPart")
-    if not hrp then isTrolling = false return end
-
-    local lookVec = hrp.CFrame.LookVector
-    local speed = 18
-    for i = 1, 3 do
-        local start = tick()
-        while tick() - start < 0.12 do
-            hrp.AssemblyLinearVelocity = Vector3.new(lookVec.X * speed, hrp.AssemblyLinearVelocity.Y, lookVec.Z * speed)
-            RunService.RenderStepped:Wait()
-        end
-        start = tick()
-        while tick() - start < 0.12 do
-            hrp.AssemblyLinearVelocity = Vector3.new(-lookVec.X * speed, hrp.AssemblyLinearUnit and 0 or hrp.AssemblyLinearVelocity.Y, -lookVec.Z * speed)
-            RunService.RenderStepped:Wait()
-        end
-    end
-    hrp.AssemblyLinearVelocity = Vector3.new(0, hrp.AssemblyLinearVelocity.Y, 0)
-    isTrolling = false
-end)
-
--- Кружок FOV
-local FOVCircle = Drawing.new("Circle")
-FOVCircle.Thickness = 1.5
-FOVCircle.Color = Color3.fromRGB(0, 170, 255)
-FOVCircle.Transparency = 0.6
-FOVCircle.Filled = false
-FOVCircle.Visible = false
-
--- ==========================================
--- ИГРОВОЙ ЦИКЛ (РЕНДЕР)
--- ==========================================
-RunService.RenderStepped:Connect(function()
-    FOVCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-    FOVCircle.Radius = Config.Aimbot.FOV
-    FOVCircle.Visible = Config.Aimbot.Enabled
-
-    -- Аимбот
-    if Config.Aimbot.Enabled then
-        local target = GetTarget(Config.Aimbot.TargetMode, Config.Aimbot.FOV)
-        if target and target.Character and target.Character:FindFirstChild("Head") then
-            local head = target.Character.Head
-            local hrp = target.Character:FindFirstChild("HumanoidRootPart")
-            local targetPos = head.Position
-            if hrp and hrp.AssemblyLinearVelocity.Magnitude > 0.1 then
-                local dist = (head.Position - Camera.CFrame.Position).Magnitude
-                targetPos = head.Position + (hrp.AssemblyLinearVelocity * (dist / 1000) * Config.Aimbot.Prediction)
-            end
-            Camera.CFrame = Camera.CFrame:Lerp(CFrame.new(Camera.CFrame.Position, targetPos), 0.2)
-        end
-    end
-
-    -- Идеальный Камлок (Камера держит в фокусе и тебя, и врага, а персонаж смотрит на цель)
-    if Config.Camlock.Active and Config.Camlock.Target and Config.Camlock.Target.Character then
-        local targetChar = Config.Camlock.Target.Character
-        local targetHRP = targetChar:FindFirstChild("HumanoidRootPart")
-        local myHRP = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-
-        if targetHRP and myHRP then
-            TargetHighlight.Adornee = targetChar
-            TargetHighlight.Enabled = true
-
-            -- Поворачиваем твоего персонажа на врага
-            myHRP.CFrame = CFrame.new(myHRP.Position, Vector3.new(targetHRP.Position.X, myHRP.Position.Y, targetHRP.Position.Z))
-
-            -- Ставим камеру сзади твоего персонажа, но направляем её так, чтобы и ты, и враг были видны на экране
-            local midPoint = (myHRP.Position + targetHRP.Position) / 2
-            local camPos = myHRP.Position - (myHRP.CFrame.LookVector * 6) + Vector3.new(0, 4, 0)
-            Camera.CFrame = CFrame.new(camPos, targetHRP.Position)
-        else
-            TargetHighlight.Enabled = false
-        end
-    else
-        TargetHighlight.Enabled = false
-    end
-end)
-
-print("✅ Smart Hub v3.0 запущен без багов камлока!")
+print("✅ Standalone Fake PC Emulator успешно запущен! Перетаскивай панель в любое место экрана.")
