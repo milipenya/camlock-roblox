@@ -1,73 +1,96 @@
 -- =================================================================
--- 🖥️ WORKING STANDALONE FAKE PC EMULATOR (WITH FUNCTIONAL WASD)
+-- 🖱️ FAKE PC LAYOUT & MOUSE SIMULATOR FOR MOBILE
 -- =================================================================
 
 local CoreGui = game:GetService("CoreGui")
 local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
 local LocalPlayer = Players.LocalPlayer
 local Camera = Workspace.CurrentCamera
 
--- Очищаем старую версию
-if CoreGui:FindFirstChild("FakePCEmulator_Standalone") then
-    CoreGui.FakePCEmulator_Standalone:Destroy()
+if CoreGui:FindFirstChild("FakePC_MouseEmulator") then
+    CoreGui.FakePC_MouseEmulator:Destroy()
 end
 
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "FakePCEmulator_Standalone"
+ScreenGui.Name = "FakePC_MouseEmulator"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.Parent = CoreGui
 
 -- ==========================================
--- 🎛️ ПАЛЬЦЕМ ПЕРЕМЕЩАЕМЫЙ КОНТЕЙНЕР КЛАВИШ
+-- 🖱️ ЭМУЛЯЦИЯ ВИРТУАЛЬНОГО КУРСОРЫ МЫШИ
 -- ==========================================
-local PCFrame = Instance.new("Frame")
-PCFrame.Name = "PCControlPanel"
-PCFrame.Size = UDim2.new(0, 200, 0, 150)
-PCFrame.Position = UDim2.new(0.6, 0, 0.4, 0) -- Сдвинул правее, чтобы не перекрывать центр экрана
-PCFrame.BackgroundTransparency = 1
-PCFrame.Active = true
-PCFrame.Draggable = true -- ВЕСЬ БЛОК МОЖНО ТАСКАТЬ ПАЛЬЦЕМ!
-PCFrame.Parent = ScreenGui
+local MouseCursor = Instance.new("Frame")
+MouseCursor.Name = "VirtualCursor"
+MouseCursor.Size = UDim2.new(0, 16, 0, 16)
+MouseCursor.AnchorPoint = Vector2.new(0.5, 0.5)
+MouseCursor.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+MouseCursor.BorderSizePixel = 1
+MouseCursor.BorderColor3 = Color3.fromRGB(0, 0, 0)
+MouseCursor.Visible = false
+MouseCursor.Parent = ScreenGui
 
--- Состояния нажатий клавиш
-local keysPressed = {
-    W = false,
-    A = false,
-    S = false,
-    D = false
-}
+local CursorCorner = Instance.new("UICorner")
+CursorCorner.CornerRadius = UDim.new(1, 0)
+CursorCorner.Parent = MouseCursor
 
-local function CreateKey(name, text, size, pos, onStateChange)
+-- Отслеживание пальца/мыши для имитации кликов ПК
+UserInputService.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement then
+        local pos = input.Position
+        MouseCursor.Position = UDim2.new(0, pos.X, 0, pos.Y)
+        MouseCursor.Visible = true
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch then
+        MouseCursor.Visible = false
+    end
+end)
+
+-- ==========================================
+-- 🎮 ПАНЕЛЬ УПРАВЛЕНИЯ (WASD + КНОПКИ ВНИЗУ)
+-- ==========================================
+local ControlPanel = Instance.new("Frame")
+ControlPanel.Name = "PCControlPanel"
+ControlPanel.Size = UDim2.new(0, 220, 0, 150)
+ControlPanel.Position = UDim2.new(0.5, -110, 0.65, 0) -- Удобно внизу экрана
+ControlPanel.BackgroundTransparency = 1
+ControlPanel.Active = true
+ControlPanel.Draggable = true -- Всю панель можно двигать
+ControlPanel.Parent = ScreenGui
+
+local keysPressed = { W = false, A = false, S = false, D = false }
+
+local function CreateButton(name, text, size, pos, callback)
     local btn = Instance.new("TextButton")
     btn.Name = name
     btn.Size = size
     btn.Position = pos
     btn.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
-    btn.BackgroundTransparency = 0.3
+    btn.BackgroundTransparency = 0.2
     btn.Text = text
     btn.TextColor3 = Color3.fromRGB(255, 255, 255)
     btn.Font = Enum.Font.SourceSansBold
-    btn.TextSize = 15
-    btn.Parent = PCFrame
+    btn.TextSize = 14
+    btn.Parent = ControlPanel
 
     local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 8)
+    corner.CornerRadius = UDim.new(0, 6)
     corner.Parent = btn
 
     local stroke = Instance.new("UIStroke")
-    stroke.Thickness = 1.5
+    stroke.Thickness = 1.2
     stroke.Color = Color3.fromRGB(0, 170, 255)
     stroke.Parent = btn
 
     local function trigger(state)
         btn.BackgroundColor3 = state and Color3.fromRGB(0, 140, 220) or Color3.fromRGB(20, 20, 30)
-        btn.BackgroundTransparency = state and 0.1 or 0.3
-        if onStateChange then
-            onStateChange(state)
-        end
+        pcall(callback, state)
     end
 
     btn.MouseButton1Down:Connect(function() trigger(true) end)
@@ -76,22 +99,21 @@ local function CreateKey(name, text, size, pos, onStateChange)
     btn.TouchEnded:Connect(function() trigger(false) end)
 end
 
--- Создаем WASD с привязкой к движению
-CreateKey("W_Key", "W", UDim2.new(0, 45, 0, 45), UDim2.new(0, 45, 0, 0), function(state) keysPressed.W = state end)
-CreateKey("A_Key", "A", UDim2.new(0, 45, 0, 45), UDim2.new(0, 0, 0, 45), function(state) keysPressed.A = state end)
-CreateKey("S_Key", "S", UDim2.new(0, 45, 0, 45), UDim2.new(0, 45, 0, 45), function(state) keysPressed.S = state end)
-CreateKey("D_Key", "D", UDim2.new(0, 45, 0, 45), UDim2.new(0, 90, 0, 45), function(state) keysPressed.D = state end)
+-- Раскладка WASD в стиле ПК
+CreateButton("W", "W", UDim2.new(0, 45, 0, 45), UDim2.new(0, 45, 0, 0), function(st) keysPressed.W = st end)
+CreateButton("A", "A", UDim2.new(0, 45, 0, 45), UDim2.new(0, 0, 0, 48), function(st) keysPressed.A = st end)
+CreateButton("S", "S", UDim2.new(0, 45, 0, 45), UDim2.new(0, 45, 0, 48), function(st) keysPressed.S = st end)
+CreateButton("D", "D", UDim2.new(0, 45, 0, 45), UDim2.new(0, 90, 0, 48), function(st) keysPressed.D = st end)
 
--- Кнопка SPACE (Прыжок)
-CreateKey("Space_Key", "SPACE", UDim2.new(0, 135, 0, 35), UDim2.new(0, 0, 0, 95), function(state)
+-- Дополнительные кнопки (Space, Shift, E)
+CreateButton("Space", "SPACE", UDim2.new(0, 135, 0, 32), UDim2.new(0, 0, 0, 98), function(st)
     local char = LocalPlayer.Character
     local hum = char and char:FindFirstChildOfClass("Humanoid")
-    if hum then hum.Jump = state end
+    if hum then hum.Jump = st end
 end)
 
--- Кнопка E (Взаимодействие)
-CreateKey("E_Key", "E", UDim2.new(0, 40, 0, 45), UDim2.new(0, 138, 0, 0), function(state)
-    if state then
+CreateButton("E", "E", UDim2.new(0, 40, 0, 45), UDim2.new(0, 140, 0, 0), function(st)
+    if st then
         for _, prompt in pairs(Workspace:GetDescendants()) do
             if prompt:IsA("ProximityPrompt") and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
                 local hrp = LocalPlayer.Character.HumanoidRootPart
@@ -103,11 +125,14 @@ CreateKey("E_Key", "E", UDim2.new(0, 40, 0, 45), UDim2.new(0, 138, 0, 0), functi
     end
 end)
 
--- Физический цикл движения по нажатию виртуальных WASD
+CreateButton("Shift", "SHIFT", UDim2.new(0, 75, 0, 32), UDim2.new(0, 140, 0, 98), function(st)
+    LocalPlayer.DevEnableMouseLock = st
+end)
+
+-- Движение персонажа через виртуальные клавиши
 RunService.RenderStepped:Connect(function()
     local char = LocalPlayer.Character
     local hum = char and char:FindFirstChildOfClass("Humanoid")
-    
     if hum then
         local moveDir = Vector3.new(0, 0, 0)
         local camFwd = Camera.CFrame.LookVector
@@ -129,29 +154,4 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- ==========================================
--- ⚙️ КНОПКА СВОРАЧИВАНИЯ ПАНЕЛИ
--- ==========================================
-local ToggleBtn = Instance.new("TextButton")
-ToggleBtn.Size = UDim2.new(0, 35, 0, 35)
-ToggleBtn.Position = UDim2.new(0, 15, 0.2, 0)
-ToggleBtn.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
-ToggleBtn.BackgroundTransparency = 0.2
-ToggleBtn.Text = "💻"
-ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-ToggleBtn.TextSize = 16
-ToggleBtn.Active = true
-ToggleBtn.Draggable = true
-ToggleBtn.Parent = ScreenGui
-
-local TCorner = Instance.new("UICorner")
-TCorner.CornerRadius = UDim.new(1, 0)
-TCorner.Parent = ToggleBtn
-
-local panelVisible = true
-ToggleBtn.MouseButton1Click:Connect(function()
-    panelVisible = not panelVisible
-    PCFrame.Visible = panelVisible
-end)
-
-print("✅ Рабочий Fake PC Emulator запущен! Клавиши WASD теперь двигают персонажа.")
+print("✅ Fake PC Layout с эмуляцией мыши успешно запущен!")
