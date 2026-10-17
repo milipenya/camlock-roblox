@@ -1,0 +1,331 @@
+-- =================================================================
+-- 🚀 UNIVERSAL SMART HUB & TROLL SUITE (MOBILE / RIVALS / MM2)
+-- =================================================================
+
+local CoreGui = game:GetService("CoreGui")
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+
+local LocalPlayer = Players.LocalPlayer
+local Camera = Workspace.CurrentCamera
+
+-- Удаление старой версии хаба
+if CoreGui:FindFirstChild("UniversalSmartHub") then
+    CoreGui.UniversalSmartHub:Destroy()
+end
+
+-- ==========================================
+-- 💻 1. SPOOF PC DEVICE (Обман игры на ПК)
+-- ==========================================
+pcall(function()
+    LocalPlayer.DevComputerMovementMode = Enum.DevComputerMovementMode.KeyboardAndMouse
+    LocalPlayer.DevComputerCameraMode = Enum.DevComputerCameraMode.Classic
+    
+    -- Блокируем отсылку мобильного типа устройства в скрипты игры
+    if UserInputService.TouchEnabled then
+        local oldGetLastInputType = UserInputService.GetLastInputType
+        -- Эмулируем последний ввод от мыши
+        UserInputService.OverrideMouseIconBehavior = Enum.OverrideMouseIconBehavior.ForceOff
+    end
+end)
+
+-- GUI Контейнер
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "UniversalSmartHub"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = CoreGui
+
+-- ==========================================
+-- 🎨 ГЛАВНОЕ МЕНЮ (HUB GUI)
+-- ==========================================
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainFrame"
+MainFrame.Size = UDim2.new(0, 260, 0, 310)
+MainFrame.Position = UDim2.new(0.5, -130, 0.3, 0)
+MainFrame.BackgroundColor3 = Color3.fromRGB(18, 18, 24)
+MainFrame.BackgroundTransparency = 0.1
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.Visible = false
+MainFrame.Parent = ScreenGui
+
+local MainCorner = Instance.new("UICorner")
+MainCorner.CornerRadius = UDim.new(0, 12)
+MainCorner.Parent = MainFrame
+
+local MainStroke = Instance.new("UIStroke")
+MainStroke.Thickness = 2
+MainStroke.Color = Color3.fromRGB(0, 170, 255)
+MainStroke.Parent = MainFrame
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 40)
+Title.BackgroundTransparency = 1
+Title.Text = "⚡ SMART HUB v1.0"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.TextSize = 16
+Title.Font = Enum.Font.SourceSansBold
+Title.Parent = MainFrame
+
+-- Переключатель меню (Плавающая кнопка)
+local HubToggle = Instance.new("TextButton")
+HubToggle.Size = UDim2.new(0, 45, 0, 45)
+HubToggle.Position = UDim2.new(0, 15, 0.15, 0)
+HubToggle.BackgroundColor3 = Color3.fromRGB(24, 24, 32)
+HubToggle.Text = "⚡"
+HubToggle.TextSize = 22
+HubToggle.Active = true
+HubToggle.Draggable = true
+HubToggle.Parent = ScreenGui
+
+local HubCorner = Instance.new("UICorner")
+HubCorner.CornerRadius = UDim.new(1, 0)
+HubCorner.Parent = HubToggle
+
+local HubStroke = Instance.new("UIStroke")
+HubStroke.Thickness = 2
+HubStroke.Color = Color3.fromRGB(0, 170, 255)
+HubStroke.Parent = HubToggle
+
+HubToggle.MouseButton1Click:Connect(function()
+    MainFrame.Visible = not MainFrame.Visible
+end)
+
+-- Контейнер для кнопок меню
+local Scroll = Instance.new("ScrollingFrame")
+Scroll.Size = UDim2.new(1, -20, 1, -50)
+Scroll.Position = UDim2.new(0, 10, 0, 45)
+Scroll.BackgroundTransparency = 1
+Scroll.CanvasSize = UDim2.new(0, 0, 0, 250)
+Scroll.ScrollBarThickness = 4
+Scroll.Parent = MainFrame
+
+local UIList = Instance.new("UIListLayout")
+UIList.Padding = UDim.new(0, 8)
+UIList.HorizontalAlignment = Enum.HorizontalAlignment.Center
+UIList.Parent = Scroll
+
+local function CreateMenuToggle(text, callback)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1, -10, 0, 42)
+    btn.BackgroundColor3 = Color3.fromRGB(28, 28, 38)
+    btn.Text = text
+    btn.TextColor3 = Color3.fromRGB(220, 220, 220)
+    btn.TextSize = 13
+    btn.Font = Enum.Font.SourceSansBold
+    btn.Parent = Scroll
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 8)
+    corner.Parent = btn
+
+    local stroke = Instance.new("UIStroke")
+    stroke.Thickness = 1
+    stroke.Color = Color3.fromRGB(60, 60, 80)
+    stroke.Parent = btn
+
+    local state = false
+    btn.MouseButton1Click:Connect(function()
+        state = not state
+        btn.BackgroundColor3 = state and Color3.fromRGB(0, 140, 220) or Color3.fromRGB(28, 28, 38)
+        btn.TextColor3 = state and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(220, 220, 220)
+        pcall(callback, state, btn)
+    end)
+    return btn
+end
+
+-- ==========================================
+-- 🎯 2. SMART AIMBOT WITH PREDICTION (Про-аим)
+-- ==========================================
+local aimbotEnabled = false
+local aimFOV = 120 -- Радиус действия аима
+
+local FOVCircle = Drawing.new("Circle")
+FOVCircle.Thickness = 1.5
+FOVCircle.Color = Color3.fromRGB(0, 170, 255)
+FOVCircle.Transparency = 0.6
+FOVCircle.Filled = false
+FOVCircle.Visible = false
+
+local function GetClosestPlayer()
+    local closestPlayer = nil
+    local shortestDistance = aimFOV
+
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Head") and player.Character:FindFirstChildOfClass("Humanoid") then
+            local hum = player.Character:FindFirstChildOfClass("Humanoid")
+            if hum.Health > 0 then
+                local head = player.Character.Head
+                local screenPos, onScreen = Camera:WorldToViewportPoint(head.Position)
+                
+                if onScreen then
+                    local mousePos = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+                    local dist = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
+                    
+                    if dist < shortestDistance then
+                        shortestDistance = dist
+                        closestPlayer = player
+                    end
+                end
+            end
+        end
+    end
+    return closestPlayer
+end
+
+RunService.RenderStepped:Connect(function()
+    FOVCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+    FOVCircle.Radius = aimFOV
+    FOVCircle.Visible = aimbotEnabled
+
+    if aimbotEnabled then
+        local target = GetClosestPlayer()
+        if target and target.Character and target.Character:FindFirstChild("Head") then
+            local head = target.Character.Head
+            local hrp = target.Character:FindFirstChild("HumanoidRootPart")
+            
+            -- Умный Предикшн (учитывает скорость врага)
+            local targetPos = head.Position
+            if hrp and hrp.AssemblyLinearVelocity.Magnitude > 0.1 then
+                local velocity = hrp.AssemblyLinearVelocity
+                local distance = (head.Position - Camera.CFrame.Position).Magnitude
+                local timeToHit = distance / 1000 -- Рассчитываем время полета пули
+                targetPos = head.Position + (velocity * timeToHit * 1.25)
+            end
+            
+            -- Плавное доведение (имитация про-игрока без резкого мгновенного магнита)
+            local currentCFrame = Camera.CFrame
+            local targetCFrame = CFrame.new(currentCFrame.Position, targetPos)
+            Camera.CFrame = currentCFrame:Lerp(targetCFrame, 0.25)
+        end
+    end
+end)
+
+CreateMenuToggle("🎯 Smart Pro-Aimbot", function(state)
+    aimbotEnabled = state
+end)
+
+-- ==========================================
+-- 🎥 3. CAMLOCK BUTTON (Физический камлок)
+-- ==========================================
+local CamlockBtn = Instance.new("TextButton")
+CamlockBtn.Size = UDim2.new(0, 110, 0, 40)
+CamlockBtn.Position = UDim2.new(0.8, -50, 0.5, 0)
+CamlockBtn.BackgroundColor3 = Color3.fromRGB(24, 24, 32)
+CamlockBtn.Text = "🎥 Camlock"
+CamlockBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+CamlockBtn.Font = Enum.Font.SourceSansBold
+CamlockBtn.TextSize = 13
+CamlockBtn.Active = true
+CamlockBtn.Draggable = true
+CamlockBtn.Visible = false
+CamlockBtn.Parent = ScreenGui
+
+local CCorner = Instance.new("UICorner")
+CCorner.CornerRadius = UDim.new(0, 8)
+CCorner.Parent = CamlockBtn
+
+local CStroke = Instance.new("UIStroke")
+CStroke.Thickness = 1.5
+CStroke.Color = Color3.fromRGB(0, 170, 255)
+CStroke.Parent = CamlockBtn
+
+local camlockActive = false
+local camlockTarget = nil
+
+CamlockBtn.MouseButton1Click:Connect(function()
+    camlockActive = not camlockActive
+    CamlockBtn.BackgroundColor3 = camlockActive and Color3.fromRGB(50, 200, 50) or Color3.fromRGB(24, 24, 32)
+    
+    if camlockActive then
+        camlockTarget = GetClosestPlayer()
+    else
+        camlockTarget = nil
+    end
+end)
+
+RunService.RenderStepped:Connect(function()
+    if camlockActive and camlockTarget and camlockTarget.Character and camlockTarget.Character:FindFirstChild("HumanoidRootPart") then
+        local targetHRP = camlockTarget.Character.HumanoidRootPart
+        local camPos = Camera.CFrame.Position
+        -- Идеальная плавная физика фиксации камеры
+        Camera.CFrame = CFrame.new(camPos, targetHRP.Position)
+    end
+end)
+
+CreateMenuToggle("🎥 Кнопка Camlock", function(state)
+    CamlockBtn.Visible = state
+    if not state then
+        camlockActive = false
+        CamlockBtn.BackgroundColor3 = Color3.fromRGB(24, 24, 32)
+    end
+end)
+
+-- ==========================================
+-- 😈 4. TROLL PEEK / HUMP BUTTON (Улучшенный 2-3 шага)
+-- ==========================================
+local TrollBtn = Instance.new("TextButton")
+TrollBtn.Size = UDim2.new(0, 120, 0, 40)
+TrollBtn.Position = UDim2.new(0.8, -50, 0.62, 0)
+TrollBtn.BackgroundColor3 = Color3.fromRGB(24, 24, 32)
+TrollBtn.Text = "😈 Troll Peek"
+TrollBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+TrollBtn.Font = Enum.Font.SourceSansBold
+TrollBtn.TextSize = 13
+TrollBtn.Active = true
+TrollBtn.Draggable = true
+TrollBtn.Visible = false
+TrollBtn.Parent = ScreenGui
+
+local TCorner = Instance.new("UICorner")
+TCorner.CornerRadius = UDim.new(0, 8)
+TCorner.Parent = TrollBtn
+
+local TStroke = Instance.new("UIStroke")
+TStroke.Thickness = 1.5
+TStroke.Color = Color3.fromRGB(255, 0, 128)
+TStroke.Parent = TrollBtn
+
+local isTrolling = false
+TrollBtn.MouseButton1Click:Connect(function()
+    if isTrolling then return end
+    isTrolling = true
+    
+    local char = LocalPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if not hrp then 
+        isTrolling = false
+        return 
+    end
+    
+    local lookVec = hrp.CFrame.LookVector
+    local speed = 15 -- Скорость рывка
+    local reps = 3 -- 3 размашистых шага вперед-назад
+    
+    for i = 1, reps do
+        -- Шаг вперед
+        local startTime = tick()
+        while tick() - startTime < 0.12 do
+            hrp.AssemblyLinearVelocity = Vector3.new(lookVec.X * speed, hrp.AssemblyLinearVelocity.Y, lookVec.Z * speed)
+            RunService.RenderStepped:Wait()
+        end
+        
+        -- Шаг назад
+        startTime = tick()
+        while tick() - startTime < 0.12 do
+            hrp.AssemblyLinearVelocity = Vector3.new(-lookVec.X * speed, hrp.AssemblyLinearVelocity.Y, -lookVec.Z * speed)
+            RunService.RenderStepped:Wait()
+        end
+    end
+    
+    hrp.AssemblyLinearVelocity = Vector3.new(0, hrp.AssemblyLinearVelocity.Y, 0)
+    isTrolling = false
+end)
+
+CreateMenuToggle("😈 Кнопка Troll Peek", function(state)
+    TrollBtn.Visible = state
+end)
+
+print("✅ UNIVERSAL SMART HUB УСПЕШНО ЗАПУЩЕН!")
